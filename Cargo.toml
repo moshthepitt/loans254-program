@@ -1,22 +1,30 @@
 [package]
-name = "bpf-program-template"
+name = "mosh-love-oov"
 version = "0.1.0"
 edition = "2018"
 license = "WTFPL"
 publish = false
 
 [dependencies]
-solana-program = "1.5.0"
+solana-program = "1.5.5"
+thiserror = "1.0.23"
+spl-token = {version = "3.0.1", features = ["no-entrypoint"]}
+arrayref = "0.3.6"
+borsh = "0.8.1"
+safe-transmute = "0.11.1"
 
 [features]
+no-entrypoint = []
 test-bpf = []
 
 [dev-dependencies]
-assert_matches = "1.4.0"
-solana-program-test = "1.5.0"
-solana-sdk = "1.5.0"
-solana-validator = "1.5.0"
+assert_matches = "1.5.0"
+solana-program-test = "1.5.5"
+solana-sdk = "1.5.5"
+solana-validator = "1.5.5"
 tokio = { version = "0.3", features = ["macros"]}
+bumpalo = { version = "3.6.0", features = ["collections"]}
+rand = "0.8.3"
 
 [lib]
 crate-type = ["cdylib", "lib"]
