@@ -20,7 +20,7 @@ use safe_transmute::to_bytes::{transmute_to_bytes};
 use bumpalo::{vec as bump_vec, Bump};
 use rand::prelude::*;
 
-use mosh_love_oov::instruction::{LoanInstruction};
+use mosh_love_oov::instruction::{LoanInstruction, init_loan};
 use mosh_love_oov::processor::{Processor};
 use mosh_love_oov::state::{Loan};
 
@@ -101,33 +101,6 @@ fn new_spl_token_program<'bump>(bump: &'bump Bump) -> AccountInfo<'bump> {
     )
 }
 
-/// Creates a `intialize` instruction.
-pub fn initialize(
-    program_id: &Pubkey,
-    borrower_pubkey: &Pubkey,
-    temp_token_acc_pubkey: &Pubkey,
-    receiving_acc_pubkey: &Pubkey,
-    loan_acc_pubkey: &Pubkey,
-    rent_acc_pubkey: &Pubkey,
-    token_acc_pubkey: &Pubkey,
-    amount: u64,
-) -> Instruction {
-    let accounts = vec![
-        AccountMeta::new(*borrower_pubkey, true),
-        AccountMeta::new(*temp_token_acc_pubkey, false),
-        AccountMeta::new_readonly(*receiving_acc_pubkey, false),
-        AccountMeta::new(*loan_acc_pubkey, false),
-        AccountMeta::new_readonly(*rent_acc_pubkey, false),
-        AccountMeta::new_readonly(*token_acc_pubkey, true),
-    ];
-
-    Instruction {
-        program_id: *program_id,
-        accounts,
-        data: LoanInstruction::InitLoan { amount }.pack_into_vec(),
-    }
-}
-
 #[tokio::test]
 async fn test_process_init_loan() {
     let mut rng = StdRng::seed_from_u64(0);
@@ -135,7 +108,7 @@ async fn test_process_init_loan() {
 
     let program_id = Pubkey::from_str(&"mosh111111111111111111111111111111111111111").unwrap();
     let account_key = Pubkey::new_unique();
-    let temp_token_key = Pubkey::new_unique();
+    // let temp_token_key = Pubkey::new_unique();
     let loan_acc_key = Pubkey::new_unique();
 
     let coin_mint = new_token_mint(&mut rng, &bump);
@@ -156,7 +129,7 @@ async fn test_process_init_loan() {
     let mut loan_acc = Account::new(
         Rent::default().minimum_balance(Loan::LEN),
         Loan::LEN,
-        &temp_token_key,
+        &program_id,
     );
     let mut rent_sysvar = rent_sysvar();
     let spl_token_program = new_spl_token_program(&bump);
@@ -171,14 +144,12 @@ async fn test_process_init_loan() {
     assert_eq!(token_acc.owner, account_key);
 
     do_process_instruction(
-        initialize(
-            &program_id,
-            &account_key,
-            &temp_token_key,
-            &receiving_token_vault.key,
-            &loan_acc_key,
-            &sysvar::rent::ID,
-            &spl_token::ID,
+        init_loan(
+            program_id,
+            account_key,
+            *temp_token_vault.key,
+            *receiving_token_vault.key,
+            loan_acc_key,
             13337,
         ),
         vec![
@@ -203,7 +174,7 @@ async fn test_process_init_loan() {
     };
     assert_eq!(true, load_data.is_initialized);
     assert_eq!(account_key, load_data.initializer_pubkey);
-    assert_eq!(temp_token_key, load_data.temp_token_account_pubkey);
+    assert_eq!(*temp_token_vault.key, load_data.temp_token_account_pubkey);
     assert_eq!(*receiving_token_vault.key, load_data.initializer_token_to_receive_account_pubkey);
     assert_eq!(13337, load_data.expected_amount);
 }

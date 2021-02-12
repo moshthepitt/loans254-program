@@ -3,10 +3,6 @@ use solana_program::{program_pack::Pack, pubkey::Pubkey};
 use solana_sdk::{
     account::Account,
 };
-use spl_token::{
-    instruction::approve,
-    state::{Account as Token, AccountState, Mint},
-};
 
 trait AddPacked {
     fn add_packable_account<T: Pack>(

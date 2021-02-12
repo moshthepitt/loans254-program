@@ -6,8 +6,7 @@ use solana_program::{
     pubkey::Pubkey,
     program_pack::{Pack, IsInitialized},
     sysvar::{rent::Rent, Sysvar},
-    program::{invoke, invoke_signed},
-    system_instruction,
+    program::{invoke},
 };
 use crate::{instruction::LoanInstruction, error::LoanError, state::Loan};
 
@@ -17,9 +16,9 @@ impl Processor {
         let instruction = LoanInstruction::unpack(instruction_data)?;
 
         match instruction {
-            LoanInstruction::InitLoan { amount: _ } => {
+            LoanInstruction::InitLoan { amount } => {
                 msg!("Instruction: InitLoan");
-                process_init_loan(program_id, accounts, instruction_data)
+                process_init_loan(program_id, accounts, amount)
             }
         }
     }
@@ -34,9 +33,9 @@ pub fn process_instruction(
     let instruction = LoanInstruction::unpack(instruction_data)?;
 
     match instruction {
-        LoanInstruction::InitLoan { amount: _ } => {
+        LoanInstruction::InitLoan { amount } => {
             msg!("Instruction: InitLoan");
-            process_init_loan(program_id, accounts, instruction_data)
+            process_init_loan(program_id, accounts, amount)
         }
     }
 }
@@ -44,7 +43,7 @@ pub fn process_instruction(
 pub fn process_init_loan(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
-    _instruction_data: &[u8],
+    amount: u64,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
@@ -56,6 +55,9 @@ pub fn process_init_loan(
 
     // get the temp token account owned by the initializer
     let temp_token_account = next_account_info(account_info_iter)?;
+    if *temp_token_account.owner != *initializer.key {
+        return Err(LoanError::NotAuthorized.into());
+    }
 
     // the account that will receive the loan if it goes through
     // ensure that it is owned by the program
@@ -65,8 +67,11 @@ pub fn process_init_loan(
     }
 
     // next get the loan account.  This will be used to store state/data
-    // about the loan.  We need to ensure it is rent-exempt
+    // about the loan.  We need to ensure it is owned by the program
     let loan_account = next_account_info(account_info_iter)?;
+    if *loan_account.owner != *program_id {
+        return Err(ProgramError::IncorrectProgramId);
+    }
 
     // get the rent sysvar and check if the loan account is rent exempt
     let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
@@ -86,7 +91,7 @@ pub fn process_init_loan(
     loan_info.initializer_pubkey = *initializer.key;
     loan_info.temp_token_account_pubkey = *temp_token_account.key;
     loan_info.initializer_token_to_receive_account_pubkey = *token_to_receive_account.key;
-    loan_info.expected_amount = 13337;
+    loan_info.expected_amount = amount;
     Loan::pack(loan_info, &mut loan_account.data.borrow_mut())?;
 
     // get the program derived address
@@ -111,42 +116,6 @@ pub fn process_init_loan(
             initializer.clone(),
             token_program.clone(),
         ],
-    )?;
-
-    Ok(())
-}
-
-/// Instruction processor
-pub fn process_example(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
-    instruction_data: &[u8],
-) -> ProgramResult {
-    // Create in iterator to safety reference accounts in the slice
-    let account_info_iter = &mut accounts.iter();
-
-    // Account info for the program being invoked
-    let system_program_info = next_account_info(account_info_iter)?;
-    // Account info to allocate
-    let allocated_info = next_account_info(account_info_iter)?;
-
-    let expected_allocated_key =
-        Pubkey::create_program_address(&[b"You pass butter", &[instruction_data[0]]], program_id)?;
-    if *allocated_info.key != expected_allocated_key {
-        // allocated key does not match the derived address
-        return Err(ProgramError::InvalidArgument);
-    }
-
-    // Invoke the system program to allocate account data
-    invoke_signed(
-        &system_instruction::allocate(allocated_info.key, 42 as u64),
-        // Order doesn't matter and this slice could include all the accounts and be:
-        // `&accounts`
-        &[
-            system_program_info.clone(), // program being invoked also needs to be included
-            allocated_info.clone(),
-        ],
-        &[&[b"You pass butter", &[instruction_data[0]]]],
     )?;
 
     Ok(())
