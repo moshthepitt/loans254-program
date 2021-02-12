@@ -6,6 +6,9 @@ pub enum LoanError {
     /// Invalid instruction
     #[error("Invalid Instruction")]
     InvalidInstruction,
+    /// Not Authorized
+    #[error("Not Authorized")]
+    NotAuthorized,
     /// Not Rent Exempt
     #[error("Not Rent Exempt")]
     NotRentExempt,
