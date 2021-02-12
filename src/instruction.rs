@@ -12,15 +12,15 @@ use crate::error::LoanError::InvalidInstruction;
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
 pub enum LoanInstruction {
 
-    /// Start the loan request by paying a loan processing fee into a temp account'
-    /// The temp account is then transferred to be owned by the program.
+    /// Start the loan request by paying a loan processing fee into a token account
+    /// The token account is then transferred to be owned by the program.
     ///
     /// Accounts expected:
     ///
     /// 0. `[signer]` The account of the person initializing the loan
-    /// 1. `[writable]` Temporary token account that should be created prior to this instruction and owned by the initializer
+    /// 1. `[writable]` Token account that should be created prior to this instruction and owned by the initializer
     /// 2. `[]` The initializer's token account for the token they will receive should the loan go through
-    /// 3. `[writable]` The loan account, it will hold all necessary info about the loan.
+    /// 3. `[writable]` The loan account, it will hold all necessary info about the loan.  Owned by the program
     /// 4. `[]` The rent sysvar
     /// 5. `[]` The token program
     InitLoan {
