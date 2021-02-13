@@ -6,10 +6,10 @@ use solana_program::{
     clock::Epoch,
     entrypoint::ProgramResult,
     instruction::{Instruction},
+    program_option::COption,
     program_pack::Pack,
     pubkey::Pubkey,
     rent::Rent,
-    sysvar,
 };
 use solana_sdk::account::{create_account, create_is_signer_account_infos, Account};
 use solana_sdk::{bpf_loader};
@@ -167,7 +167,7 @@ async fn test_process_init_loan() {
 
     // assert_ne!(token_acc.owner, account_key);
 
-    let load_data = Loan::unpack_from_slice(&loan_acc.data);
+    let load_data = Loan::unpack(&loan_acc.data);
     let load_data = match load_data {
         Ok(data) => data,
         Err(error) => panic!("Problem opening the file: {:?}", error),
@@ -179,4 +179,11 @@ async fn test_process_init_loan() {
     assert_eq!(13337, load_data.expected_amount);
     assert_eq!(9, load_data.interest_rate);
     assert_eq!(86400, load_data.duration);
+    assert_eq!(false, load_data.is_guaranteed);
+    assert_eq!(13337 * (86400 / (86400 * 365) * (1 + 09 + 01)), load_data.amount);
+
+    // let option = Some(account_key);
+    // let c_option: COption<Pubkey> = option.into();
+    assert_eq!(false, load_data.guarantor_pubkey.is_some());
+    assert_eq!(false, load_data.lender_pubkey.is_some());
 }
