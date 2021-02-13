@@ -28,6 +28,8 @@ pub enum LoanInstruction {
         amount: u64
     },
     /// Guarantee a loan
+    /// Basically meant to be a mechanism through which collateral is provided for a loan
+    /// This could be by a third party of by the borrower
     ///
     /// 0. `[signer]` The account of the person guaranteeing the loan
     /// 1. `[writable]` Token account that holds the collateral.  Should be owned by guarantor
@@ -35,6 +37,16 @@ pub enum LoanInstruction {
     /// 4. `[]` The rent sysvar
     /// 5. `[]` The token program
     GuaranteeLoan,
+    /// Accept the loan
+    /// Basically, sends money to the borrower, from the lender
+    /// 0. `[signer]` The account of the person lending the money
+    /// 1. `[writable]` Token account that whose funds will be transferred to borrower
+    /// 2. `[]` The lender's token account for the token they will receive should when loan is repaid
+    /// 3. `[writable]` The borrower's token account to receive the borrowed loan amount
+    /// 4. `[writable]` The loan account, has information about the loan
+    /// 5. `[]` The rent sysvar
+    /// 6. `[]` The token program
+    AcceptLoan,
 }
 
 impl LoanInstruction {
@@ -107,6 +119,31 @@ pub fn guarantee_loan(
             AccountMeta::new_readonly(spl_token::id(), false),
         ],
         data: LoanInstruction::GuaranteeLoan
+        .pack_into_vec(),
+    }
+}
+
+/// Creates an 'AcceptLoan' instruction.
+pub fn accept_loan(
+    program_id: Pubkey,
+    lender_pubkey: Pubkey,
+    lender_loan_transfer_token_pubkey: Pubkey,
+    lender_repayment_token_pubkey: Pubkey,
+    borrower_loan_receive_pubkey: Pubkey,
+    loan_account_pubkey: Pubkey,
+) -> Instruction {
+    Instruction {
+        program_id,
+        accounts: vec![
+            AccountMeta::new(lender_pubkey, true),
+            AccountMeta::new_readonly(lender_loan_transfer_token_pubkey, false),
+            AccountMeta::new_readonly(lender_repayment_token_pubkey, false),
+            AccountMeta::new(loan_account_pubkey, false),
+            AccountMeta::new(borrower_loan_receive_pubkey, false),
+            AccountMeta::new_readonly(sysvar::rent::id(), false),
+            AccountMeta::new_readonly(spl_token::id(), false),
+        ],
+        data: LoanInstruction::AcceptLoan
         .pack_into_vec(),
     }
 }
