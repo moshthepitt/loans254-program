@@ -5,7 +5,7 @@ use solana_program::{
     account_info::AccountInfo,
     clock::Epoch,
     entrypoint::ProgramResult,
-    instruction::{AccountMeta, Instruction},
+    instruction::{Instruction},
     program_pack::Pack,
     pubkey::Pubkey,
     rent::Rent,
@@ -20,7 +20,7 @@ use safe_transmute::to_bytes::{transmute_to_bytes};
 use bumpalo::{vec as bump_vec, Bump};
 use rand::prelude::*;
 
-use mosh_love_oov::instruction::{LoanInstruction, init_loan};
+use mosh_love_oov::instruction::{init_loan};
 use mosh_love_oov::processor::{Processor};
 use mosh_love_oov::state::{Loan};
 
@@ -177,4 +177,6 @@ async fn test_process_init_loan() {
     assert_eq!(*temp_token_vault.key, load_data.temp_token_account_pubkey);
     assert_eq!(*receiving_token_vault.key, load_data.initializer_token_to_receive_account_pubkey);
     assert_eq!(13337, load_data.expected_amount);
+    assert_eq!(9, load_data.interest_rate);
+    assert_eq!(86400, load_data.duration);
 }

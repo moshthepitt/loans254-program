@@ -9,6 +9,7 @@ use solana_program::{
     program::{invoke},
 };
 use crate::{instruction::LoanInstruction, error::LoanError, state::Loan};
+use crate::{utils::{get_duration, get_interest_rate}};
 
 pub struct Processor;
 impl Processor {
@@ -92,6 +93,8 @@ pub fn process_init_loan(
     loan_info.temp_token_account_pubkey = *temp_token_account.key;
     loan_info.initializer_token_to_receive_account_pubkey = *token_to_receive_account.key;
     loan_info.expected_amount = amount;
+    loan_info.interest_rate = get_interest_rate(&initializer.key,  amount);
+    loan_info.duration = get_duration(&initializer.key,  amount);
     Loan::pack(loan_info, &mut loan_account.data.borrow_mut())?;
 
     // get the program derived address
