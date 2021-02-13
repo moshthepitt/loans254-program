@@ -36,18 +36,18 @@ impl Pack for Loan {
         let src = array_ref![src, 0, Loan::LEN];
         let (
             is_initialized,
+            is_guaranteed,
             initializer_pubkey,
             temp_token_account_pubkey,
             borrower_loan_receive_pubkey,
             guarantor_pubkey,
             lender_pubkey,
             lender_loan_repayment_pubkey,
-            is_guaranteed,
             expected_amount,
             amount,
             interest_rate,
             duration,
-        ) = array_refs![src, 1, 32, 32, 32, 36, 36, 36, 1, 8, 8, 4, 4];
+        ) = array_refs![src, 1, 1, 32, 32, 32, 36, 36, 36, 8, 8, 4, 4];
         let is_initialized = match is_initialized {
             [0] => false,
             [1] => true,
@@ -61,13 +61,13 @@ impl Pack for Loan {
 
         Ok(Loan {
             is_initialized,
+            is_guaranteed,
             initializer_pubkey: Pubkey::new_from_array(*initializer_pubkey),
             temp_token_account_pubkey: Pubkey::new_from_array(*temp_token_account_pubkey),
             borrower_loan_receive_pubkey: Pubkey::new_from_array(*borrower_loan_receive_pubkey),
             guarantor_pubkey: unpack_coption_key(guarantor_pubkey)?,
             lender_pubkey: unpack_coption_key(lender_pubkey)?,
             lender_loan_repayment_pubkey: unpack_coption_key(lender_loan_repayment_pubkey)?,
-            is_guaranteed,
             expected_amount: u64::from_le_bytes(*expected_amount),
             amount: u64::from_le_bytes(*amount),
             interest_rate: u32::from_le_bytes(*interest_rate),
@@ -79,28 +79,28 @@ impl Pack for Loan {
         let dst = array_mut_ref![dst, 0, Loan::LEN];
         let (
             is_initialized_dst,
+            is_guaranteed_dst,
             initializer_pubkey_dst,
             temp_token_account_pubkey_dst,
             borrower_loan_receive_pubkey_dst,
             guarantor_pubkey_dst,
             lender_pubkey_dst,
             lender_loan_repayment_pubkey_dst,
-            is_guaranteed_dst,
             expected_amount_dst,
             amount_dst,
             interest_rate_dst,
             duration_dst,
-        ) = mut_array_refs![dst, 1, 32, 32, 32, 36, 36, 36, 1, 8, 8, 4, 4];
+        ) = mut_array_refs![dst, 1, 1, 32, 32, 32, 36, 36, 36, 8, 8, 4, 4];
 
         let Loan {
             is_initialized,
+            is_guaranteed,
             initializer_pubkey,
             temp_token_account_pubkey,
             borrower_loan_receive_pubkey,
             guarantor_pubkey,
             lender_pubkey,
             lender_loan_repayment_pubkey,
-            is_guaranteed,
             expected_amount,
             amount,
             interest_rate,
@@ -108,13 +108,13 @@ impl Pack for Loan {
         } = self;
 
         is_initialized_dst[0] = *is_initialized as u8;
+        is_guaranteed_dst[0] = *is_guaranteed as u8;
         initializer_pubkey_dst.copy_from_slice(initializer_pubkey.as_ref());
         temp_token_account_pubkey_dst.copy_from_slice(temp_token_account_pubkey.as_ref());
         borrower_loan_receive_pubkey_dst.copy_from_slice(borrower_loan_receive_pubkey.as_ref());
         pack_coption_key(guarantor_pubkey, guarantor_pubkey_dst);
         pack_coption_key(lender_pubkey, lender_pubkey_dst);
         pack_coption_key(lender_loan_repayment_pubkey, lender_loan_repayment_pubkey_dst);
-        is_guaranteed_dst[0] = *is_guaranteed as u8;
         *expected_amount_dst = expected_amount.to_le_bytes();
         *amount_dst = amount.to_le_bytes();
         *interest_rate_dst = interest_rate.to_le_bytes();
