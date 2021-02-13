@@ -26,7 +26,15 @@ pub enum LoanInstruction {
     InitLoan {
         /// The amount party A expects to receive as a loan of token Y
         amount: u64
-    }
+    },
+    /// Guarantee a loan
+    ///
+    /// 0. `[signer]` The account of the person guaranteeing the loan
+    /// 1. `[writable]` Token account that holds the collateral.  Should be owned by guarantor
+    /// 3. `[writable]` The loan account, has information about the loan
+    /// 4. `[]` The rent sysvar
+    /// 5. `[]` The token program
+    GuaranteeLoan,
 }
 
 impl LoanInstruction {
@@ -78,6 +86,27 @@ pub fn init_loan(
         data: LoanInstruction::InitLoan {
             amount,
         }
+        .pack_into_vec(),
+    }
+}
+
+/// Creates an 'GuaranteeLoan' instruction.
+pub fn guarantee_loan(
+    program_id: Pubkey,
+    guarantor_pubkey: Pubkey,
+    collateral_account_pubkey: Pubkey,
+    loan_account_pubkey: Pubkey,
+) -> Instruction {
+    Instruction {
+        program_id,
+        accounts: vec![
+            AccountMeta::new(guarantor_pubkey, true),
+            AccountMeta::new(collateral_account_pubkey, false),
+            AccountMeta::new(loan_account_pubkey, false),
+            AccountMeta::new_readonly(sysvar::rent::id(), false),
+            AccountMeta::new_readonly(spl_token::id(), false),
+        ],
+        data: LoanInstruction::GuaranteeLoan
         .pack_into_vec(),
     }
 }
