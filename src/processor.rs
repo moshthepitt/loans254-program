@@ -25,6 +25,10 @@ impl Processor {
                 msg!("Instruction: GuaranteeLoan");
                 process_guarantee_loan(program_id, accounts)
             }
+            LoanInstruction::AcceptLoan => {
+                msg!("Instruction: AcceptLoan");
+                process_accept_loan(program_id, accounts)
+            }
         }
     }
 }
@@ -45,6 +49,10 @@ pub fn process_instruction(
         LoanInstruction::GuaranteeLoan => {
             msg!("Instruction: GuaranteeLoan");
             process_guarantee_loan(program_id, accounts)
+        }
+        LoanInstruction::AcceptLoan => {
+            msg!("Instruction: AcceptLoan");
+            process_accept_loan(program_id, accounts)
         }
     }
 }
@@ -99,7 +107,7 @@ pub fn process_init_loan(
     loan_info.is_initialized = true;
     loan_info.initializer_pubkey = *initializer.key;
     loan_info.temp_token_account_pubkey = *temp_token_account.key;
-    loan_info.initializer_token_to_receive_account_pubkey = *token_to_receive_account.key;
+    loan_info.borrower_loan_receive_pubkey = *token_to_receive_account.key;
     loan_info.expected_amount = amount;
     loan_info.interest_rate = get_interest_rate(&initializer.key,  amount);
     loan_info.duration = get_duration(&initializer.key,  amount);
@@ -148,15 +156,15 @@ pub fn process_guarantee_loan(
     if *collateral_account_info.owner != *guarantor_info.key {
         return Err(LoanError::NotAuthorized.into());
     }
-    // get the rent sysvar and check if the loan account is rent exempt
-    let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
-    if !rent.is_exempt(collateral_account_info.lamports(), collateral_account_info.data_len()) {
-        return Err(LoanError::NotRentExempt.into());
-    }
     // get the loan account and assert that it is owned by the program
     let loan_account_info = next_account_info(account_info_iter)?;
     if *loan_account_info.owner != *program_id {
         return Err(ProgramError::IncorrectProgramId);
+    }
+    // get the rent sysvar and check if the loan account is rent exempt
+    let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
+    if !rent.is_exempt(loan_account_info.lamports(), loan_account_info.data_len()) {
+        return Err(LoanError::NotRentExempt.into());
     }
     // get the loan data
     let mut loan_data = Loan::unpack(&loan_account_info.data.borrow())?;
@@ -173,7 +181,6 @@ pub fn process_guarantee_loan(
     loan_data.is_guaranteed = true;
     loan_data.guarantor_pubkey = Some(*guarantor_info.key).into();
     Loan::pack(loan_data, &mut loan_account_info.data.borrow_mut())?;
-
     // get the program derived address
     let (pda, _bump_seed) = Pubkey::find_program_address(&[b"loan"], program_id);
     // change the owner of the collateral account to be the pda
@@ -187,13 +194,117 @@ pub fn process_guarantee_loan(
         guarantor_info.key,
         &[&guarantor_info.key],
     )?;
-
     msg!("Calling the token program to transfer collateral account ownership...");
     invoke(
         &owner_change_ix,
         &[
             collateral_account_info.clone(),
             guarantor_info.clone(),
+            token_program.clone(),
+        ],
+    )?;
+
+    Ok(())
+}
+
+pub fn process_accept_loan(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+) -> ProgramResult {
+    let account_info_iter = &mut accounts.iter();
+
+    // get the lender and assert that they can sign
+    let lender_info = next_account_info(account_info_iter)?;
+    if !lender_info.is_signer {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+    // get the loan transfer account owned by the lender
+    let lender_loan_transfer_info = next_account_info(account_info_iter)?;
+    if *lender_loan_transfer_info.owner != *lender_info.key {
+        return Err(LoanError::NotAuthorized.into());
+    }
+    // the account that will receive the loan when it is repaid
+    let lender_repayment_account_info = next_account_info(account_info_iter)?;
+    if *lender_repayment_account_info.owner != spl_token::id() {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    // the account that will receive the loan when it is repaid
+    let borrower_loan_receive_account_info = next_account_info(account_info_iter)?;
+    // next get the loan account.  This will be used to store state/data
+    // about the loan.  We need to ensure it is owned by the program
+    let loan_account_info = next_account_info(account_info_iter)?;
+    if *loan_account_info.owner != *program_id {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    // get the rent sysvar and check if the loan account is rent exempt
+    let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
+    if !rent.is_exempt(loan_account_info.lamports(), loan_account_info.data_len()) {
+        return Err(LoanError::NotRentExempt.into());
+    }
+    // confirm the loan repayment account is rent exempt
+    if !rent.is_exempt(lender_repayment_account_info.lamports(), loan_account_info.data_len()) {
+        return Err(LoanError::NotRentExempt.into());
+    }
+    // get the loan data
+    let mut loan_data = Loan::unpack(&loan_account_info.data.borrow())?;
+    // fail is loan is not initialized
+    if !loan_data.is_initialized() {
+        return Err(ProgramError::UninitializedAccount);
+    }
+    // Ensure we have the right account to send borrowed funds to
+    if *borrower_loan_receive_account_info.key != loan_data.borrower_loan_receive_pubkey {
+        return Err(LoanError::NotAuthorized.into());
+    }
+    // fail if loan transfer account balance is not sufficient
+    if lender_loan_transfer_info.lamports() < loan_data.amount {
+        return Err(ProgramError::InsufficientFunds);
+    }
+    let amount: u64 = loan_data.expected_amount;
+    // update loan info
+    msg!("Updating loan information...");
+    loan_data.lender_pubkey = Some(*lender_info.key).into();
+    loan_data.lender_loan_repayment_pubkey = Some(*lender_repayment_account_info.key).into();
+    Loan::pack(loan_data, &mut loan_account_info.data.borrow_mut())?;
+    // change the owner of the loan repayment info account to be the pda
+    // essentially the program now fully controls the loan repayment account
+    // get the program derived address
+    let (pda, _bump_seed) = Pubkey::find_program_address(&[b"loan"], program_id);
+    let token_program = next_account_info(account_info_iter)?;
+    let owner_change_ix = spl_token::instruction::set_authority(
+        token_program.key,
+        lender_repayment_account_info.key,
+        Some(&pda),
+        spl_token::instruction::AuthorityType::AccountOwner,
+        lender_info.key,
+        &[&lender_info.key],
+    )?;
+    msg!("Calling the token program to transfer loan repayment account ownership...");
+    invoke(
+        &owner_change_ix,
+        &[
+            lender_repayment_account_info.clone(),
+            lender_info.clone(),
+            token_program.clone(),
+        ],
+    )?;
+    // change the owner of the loan transfer account to be the borrower
+    // essentially the borrower now gets the funds
+    let token_program = next_account_info(account_info_iter)?;
+    let transfer_to_initializer_ix = spl_token::instruction::transfer(
+        token_program.key,
+        lender_loan_transfer_info.key,
+        borrower_loan_receive_account_info.key,
+        lender_info.key,
+        &[&lender_info.key],
+        amount,
+    )?;
+    msg!("Calling the token program to transfer tokens to the borrower...");
+    invoke(
+        &transfer_to_initializer_ix,
+        &[
+            lender_loan_transfer_info.clone(),
+            borrower_loan_receive_account_info.clone(),
+            lender_info.clone(),
             token_program.clone(),
         ],
     )?;
