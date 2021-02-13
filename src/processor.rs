@@ -9,7 +9,7 @@ use solana_program::{
     program::{invoke},
 };
 use crate::{instruction::LoanInstruction, error::LoanError, state::Loan};
-use crate::{utils::{get_duration, get_interest_rate}};
+use crate::{utils::{get_borrowed_amount, get_duration, get_interest_rate}};
 
 pub struct Processor;
 impl Processor {
@@ -20,6 +20,10 @@ impl Processor {
             LoanInstruction::InitLoan { amount } => {
                 msg!("Instruction: InitLoan");
                 process_init_loan(program_id, accounts, amount)
+            }
+            LoanInstruction::GuaranteeLoan => {
+                msg!("Instruction: GuaranteeLoan");
+                process_guarantee_loan(program_id, accounts)
             }
         }
     }
@@ -37,6 +41,10 @@ pub fn process_instruction(
         LoanInstruction::InitLoan { amount } => {
             msg!("Instruction: InitLoan");
             process_init_loan(program_id, accounts, amount)
+        }
+        LoanInstruction::GuaranteeLoan => {
+            msg!("Instruction: GuaranteeLoan");
+            process_guarantee_loan(program_id, accounts)
         }
     }
 }
@@ -95,6 +103,7 @@ pub fn process_init_loan(
     loan_info.expected_amount = amount;
     loan_info.interest_rate = get_interest_rate(&initializer.key,  amount);
     loan_info.duration = get_duration(&initializer.key,  amount);
+    loan_info.amount = get_borrowed_amount(&initializer.key, amount, loan_info.duration, loan_info.interest_rate);
     Loan::pack(loan_info, &mut loan_account.data.borrow_mut())?;
 
     // get the program derived address
@@ -117,6 +126,74 @@ pub fn process_init_loan(
         &[
             temp_token_account.clone(),
             initializer.clone(),
+            token_program.clone(),
+        ],
+    )?;
+
+    Ok(())
+}
+
+pub fn process_guarantee_loan(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+) -> ProgramResult {
+    let account_info_iter = &mut accounts.iter();
+    // get the guarantor and assert that they can sign
+    let guarantor_info = next_account_info(account_info_iter)?;
+    if !guarantor_info.is_signer {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+    // get the collateral_account owned by the guarantor
+    let collateral_account_info = next_account_info(account_info_iter)?;
+    if *collateral_account_info.owner != *guarantor_info.key {
+        return Err(LoanError::NotAuthorized.into());
+    }
+    // get the rent sysvar and check if the loan account is rent exempt
+    let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
+    if !rent.is_exempt(collateral_account_info.lamports(), collateral_account_info.data_len()) {
+        return Err(LoanError::NotRentExempt.into());
+    }
+    // get the loan account and assert that it is owned by the program
+    let loan_account_info = next_account_info(account_info_iter)?;
+    if *loan_account_info.owner != *program_id {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    // get the loan data
+    let mut loan_data = Loan::unpack(&loan_account_info.data.borrow())?;
+    // fail is loan is not initialized
+    if !loan_data.is_initialized() {
+        return Err(ProgramError::UninitializedAccount);
+    }
+    // fail if collateral is not sufficient
+    if collateral_account_info.lamports() < loan_data.amount {
+        return Err(ProgramError::InsufficientFunds);
+    }
+    // update loan info
+    msg!("Updating loan information...");
+    loan_data.is_guaranteed = true;
+    loan_data.guarantor_pubkey = Some(*guarantor_info.key).into();
+    Loan::pack(loan_data, &mut loan_account_info.data.borrow_mut())?;
+
+    // get the program derived address
+    let (pda, _bump_seed) = Pubkey::find_program_address(&[b"loan"], program_id);
+    // change the owner of the collateral account to be the pda
+    // essentially the program now fully controls the loan collateral
+    let token_program = next_account_info(account_info_iter)?;
+    let owner_change_ix = spl_token::instruction::set_authority(
+        token_program.key,
+        collateral_account_info.key,
+        Some(&pda),
+        spl_token::instruction::AuthorityType::AccountOwner,
+        guarantor_info.key,
+        &[&guarantor_info.key],
+    )?;
+
+    msg!("Calling the token program to transfer collateral account ownership...");
+    invoke(
+        &owner_change_ix,
+        &[
+            collateral_account_info.clone(),
+            guarantor_info.clone(),
             token_program.clone(),
         ],
     )?;
