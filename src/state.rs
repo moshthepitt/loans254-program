@@ -1,16 +1,22 @@
 use solana_program::{
     program_error::ProgramError,
+    program_option::COption,
     program_pack::{IsInitialized, Pack, Sealed},
     pubkey::Pubkey,
 };
 use arrayref::{array_mut_ref, array_ref, array_refs, mut_array_refs};
+use crate::utils::{pack_coption_key, unpack_coption_key};
 
 pub struct Loan {
     pub is_initialized: bool,
-    pub initializer_pubkey: Pubkey,
+    pub initializer_pubkey: Pubkey,  // the account that wants to borrow
     pub temp_token_account_pubkey: Pubkey,  // this account holds loan processing fee
     pub initializer_token_to_receive_account_pubkey: Pubkey, // loan amount will be sent here if successful
-    pub expected_amount: u64,  // the loan amount
+    pub guarantor_pubkey: COption<Pubkey>, // the person providing collateral for the loans
+    pub lender_pubkey: COption<Pubkey>, // the person providing the loans
+    pub is_guaranteed: bool,  // is the loan fully guaranteed
+    pub expected_amount: u64,  // the expected loan amount
+    pub amount: u64,  // the loan amount including interest
     pub interest_rate: u32,  // the loan interest rate annualized.  Note that this is an unsigned int so something like 9 would actually represent 9/100 interest rate
     pub duration: u32,  // the loan duration in seconds
 }
@@ -24,7 +30,7 @@ impl IsInitialized for Loan {
 }
 
 impl Pack for Loan {
-    const LEN: usize = 113;
+    const LEN: usize = 194;
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
         let src = array_ref![src, 0, Loan::LEN];
         let (
@@ -32,11 +38,20 @@ impl Pack for Loan {
             initializer_pubkey,
             temp_token_account_pubkey,
             initializer_token_to_receive_account_pubkey,
+            guarantor_pubkey,
+            lender_pubkey,
+            is_guaranteed,
             expected_amount,
+            amount,
             interest_rate,
             duration,
-        ) = array_refs![src, 1, 32, 32, 32, 8, 4, 4];
+        ) = array_refs![src, 1, 32, 32, 32, 36, 36, 1, 8, 8, 4, 4];
         let is_initialized = match is_initialized {
+            [0] => false,
+            [1] => true,
+            _ => return Err(ProgramError::InvalidAccountData),
+        };
+        let is_guaranteed = match is_guaranteed {
             [0] => false,
             [1] => true,
             _ => return Err(ProgramError::InvalidAccountData),
@@ -47,7 +62,11 @@ impl Pack for Loan {
             initializer_pubkey: Pubkey::new_from_array(*initializer_pubkey),
             temp_token_account_pubkey: Pubkey::new_from_array(*temp_token_account_pubkey),
             initializer_token_to_receive_account_pubkey: Pubkey::new_from_array(*initializer_token_to_receive_account_pubkey),
+            guarantor_pubkey: unpack_coption_key(guarantor_pubkey)?,
+            lender_pubkey: unpack_coption_key(lender_pubkey)?,
+            is_guaranteed,
             expected_amount: u64::from_le_bytes(*expected_amount),
+            amount: u64::from_le_bytes(*amount),
             interest_rate: u32::from_le_bytes(*interest_rate),
             duration: u32::from_le_bytes(*duration),
         })
@@ -60,17 +79,25 @@ impl Pack for Loan {
             initializer_pubkey_dst,
             temp_token_account_pubkey_dst,
             initializer_token_to_receive_account_pubkey_dst,
+            guarantor_pubkey_dst,
+            lender_pubkey_dst,
+            is_guaranteed_dst,
             expected_amount_dst,
+            amount_dst,
             interest_rate_dst,
             duration_dst,
-        ) = mut_array_refs![dst, 1, 32, 32, 32, 8, 4, 4];
+        ) = mut_array_refs![dst, 1, 32, 32, 32, 36, 36, 1, 8, 8, 4, 4];
 
         let Loan {
             is_initialized,
             initializer_pubkey,
             temp_token_account_pubkey,
             initializer_token_to_receive_account_pubkey,
+            guarantor_pubkey,
+            lender_pubkey,
+            is_guaranteed,
             expected_amount,
+            amount,
             interest_rate,
             duration,
         } = self;
@@ -79,7 +106,11 @@ impl Pack for Loan {
         initializer_pubkey_dst.copy_from_slice(initializer_pubkey.as_ref());
         temp_token_account_pubkey_dst.copy_from_slice(temp_token_account_pubkey.as_ref());
         initializer_token_to_receive_account_pubkey_dst.copy_from_slice(initializer_token_to_receive_account_pubkey.as_ref());
+        pack_coption_key(guarantor_pubkey, guarantor_pubkey_dst);
+        pack_coption_key(lender_pubkey, lender_pubkey_dst);
+        is_guaranteed_dst[0] = *is_guaranteed as u8;
         *expected_amount_dst = expected_amount.to_le_bytes();
+        *amount_dst = amount.to_le_bytes();
         *interest_rate_dst = interest_rate.to_le_bytes();
         *duration_dst = duration.to_le_bytes();
     }
