@@ -7,15 +7,23 @@ use solana_program::{
 use arrayref::{array_mut_ref, array_ref, array_refs, mut_array_refs};
 use crate::utils::{pack_coption_key, unpack_coption_key};
 
+pub enum LoanStatus {
+    Pending = 0,
+    Initialized = 1,
+    Guaranteed = 2,
+    Accepted = 3,
+    Cancelled = 4,
+}
+
 pub struct Loan {
     pub is_initialized: bool,
+    pub status: u8,  // the loan status
     pub initializer_pubkey: Pubkey,  // the account that wants to borrow
     pub temp_token_account_pubkey: Pubkey,  // this account holds loan processing fee
     pub borrower_loan_receive_pubkey: Pubkey, // loan amount will be sent here if successful
     pub guarantor_pubkey: COption<Pubkey>, // the person providing collateral for the loans
     pub lender_pubkey: COption<Pubkey>, // the person providing the loans
     pub lender_loan_repayment_pubkey: COption<Pubkey>, // the person providing the loans
-    pub is_guaranteed: bool,  // is the loan fully guaranteed
     pub expected_amount: u64,  // the expected loan amount
     pub amount: u64,  // the loan amount including interest
     pub interest_rate: u32,  // the loan interest rate annualized.  Note that this is an unsigned int so something like 9 would actually represent 9/100 interest rate
@@ -36,7 +44,7 @@ impl Pack for Loan {
         let src = array_ref![src, 0, Loan::LEN];
         let (
             is_initialized,
-            is_guaranteed,
+            status,
             initializer_pubkey,
             temp_token_account_pubkey,
             borrower_loan_receive_pubkey,
@@ -53,15 +61,10 @@ impl Pack for Loan {
             [1] => true,
             _ => return Err(ProgramError::InvalidAccountData),
         };
-        let is_guaranteed = match is_guaranteed {
-            [0] => false,
-            [1] => true,
-            _ => return Err(ProgramError::InvalidAccountData),
-        };
 
         Ok(Loan {
             is_initialized,
-            is_guaranteed,
+            status: u8::from_le_bytes(*status),
             initializer_pubkey: Pubkey::new_from_array(*initializer_pubkey),
             temp_token_account_pubkey: Pubkey::new_from_array(*temp_token_account_pubkey),
             borrower_loan_receive_pubkey: Pubkey::new_from_array(*borrower_loan_receive_pubkey),
@@ -79,7 +82,7 @@ impl Pack for Loan {
         let dst = array_mut_ref![dst, 0, Loan::LEN];
         let (
             is_initialized_dst,
-            is_guaranteed_dst,
+            status_dst,
             initializer_pubkey_dst,
             temp_token_account_pubkey_dst,
             borrower_loan_receive_pubkey_dst,
@@ -94,7 +97,7 @@ impl Pack for Loan {
 
         let Loan {
             is_initialized,
-            is_guaranteed,
+            status,
             initializer_pubkey,
             temp_token_account_pubkey,
             borrower_loan_receive_pubkey,
@@ -108,7 +111,7 @@ impl Pack for Loan {
         } = self;
 
         is_initialized_dst[0] = *is_initialized as u8;
-        is_guaranteed_dst[0] = *is_guaranteed as u8;
+        *status_dst = status.to_le_bytes();
         initializer_pubkey_dst.copy_from_slice(initializer_pubkey.as_ref());
         temp_token_account_pubkey_dst.copy_from_slice(temp_token_account_pubkey.as_ref());
         borrower_loan_receive_pubkey_dst.copy_from_slice(borrower_loan_receive_pubkey.as_ref());

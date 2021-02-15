@@ -8,7 +8,7 @@ use solana_program::{
     sysvar::{rent::Rent, Sysvar},
     program::{invoke},
 };
-use crate::{instruction::LoanInstruction, error::LoanError, state::Loan};
+use crate::{instruction::LoanInstruction, error::LoanError, state::{Loan, LoanStatus}};
 use crate::{utils::{get_borrowed_amount, get_duration, get_interest_rate}};
 
 pub struct Processor;
@@ -105,6 +105,7 @@ pub fn process_init_loan(
     // create the Loan object
     msg!("Saving loan information...");
     loan_info.is_initialized = true;
+    loan_info.status = LoanStatus::Initialized as u8;
     loan_info.initializer_pubkey = *initializer.key;
     loan_info.temp_token_account_pubkey = *temp_token_account.key;
     loan_info.borrower_loan_receive_pubkey = *token_to_receive_account.key;
@@ -178,7 +179,7 @@ pub fn process_guarantee_loan(
     }
     // update loan info
     msg!("Updating loan information...");
-    loan_data.is_guaranteed = true;
+    loan_data.status = LoanStatus::Guaranteed as u8;
     loan_data.guarantor_pubkey = Some(*guarantor_info.key).into();
     Loan::pack(loan_data, &mut loan_account_info.data.borrow_mut())?;
     // get the program derived address
@@ -262,6 +263,7 @@ pub fn process_accept_loan(
     let amount: u64 = loan_data.expected_amount;
     // update loan info
     msg!("Updating loan information...");
+    loan_data.status = LoanStatus::Accepted as u8;
     loan_data.lender_pubkey = Some(*lender_info.key).into();
     loan_data.lender_loan_repayment_pubkey = Some(*lender_repayment_account_info.key).into();
     Loan::pack(loan_data, &mut loan_account_info.data.borrow_mut())?;

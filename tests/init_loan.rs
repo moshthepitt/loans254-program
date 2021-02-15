@@ -22,7 +22,7 @@ use rand::prelude::*;
 
 use mosh_love_oov::instruction::{init_loan};
 use mosh_love_oov::processor::{Processor};
-use mosh_love_oov::state::{Loan};
+use mosh_love_oov::state::{Loan, LoanStatus};
 
 fn do_process_instruction(
     instruction: Instruction,
@@ -179,11 +179,12 @@ async fn test_process_init_loan() {
     assert_eq!(13337, load_data.expected_amount);
     assert_eq!(9, load_data.interest_rate);
     assert_eq!(86400, load_data.duration);
-    assert_eq!(false, load_data.is_guaranteed);
+    assert_eq!(LoanStatus::Initialized as u8, load_data.status);
     assert_eq!(13337 * (86400 / (86400 * 365) * (1 + 09 + 01)), load_data.amount);
 
     // let option = Some(account_key);
     // let c_option: COption<Pubkey> = option.into();
     assert_eq!(false, load_data.guarantor_pubkey.is_some());
     assert_eq!(false, load_data.lender_pubkey.is_some());
+    assert_eq!(false, load_data.lender_loan_repayment_pubkey.is_some());
 }
