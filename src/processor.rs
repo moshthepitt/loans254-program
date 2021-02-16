@@ -1,12 +1,13 @@
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
+    program_option::COption,
     program_error::ProgramError,
     msg,
     pubkey::Pubkey,
     program_pack::{Pack, IsInitialized},
     sysvar::{rent::Rent, Sysvar},
-    program::{invoke},
+    program::{invoke, invoke_signed},
 };
 use crate::{instruction::LoanInstruction, error::LoanError, state::{Loan, LoanStatus}};
 use crate::{utils::{get_borrowed_amount, get_duration, get_interest_rate}};
@@ -28,6 +29,10 @@ impl Processor {
             LoanInstruction::AcceptLoan => {
                 msg!("Instruction: AcceptLoan");
                 process_accept_loan(program_id, accounts)
+            }
+            LoanInstruction::RepayLoan => {
+                msg!("Instruction: RepayLoan");
+                process_repay_loan(program_id, accounts)
             }
         }
     }
@@ -53,6 +58,10 @@ pub fn process_instruction(
         LoanInstruction::AcceptLoan => {
             msg!("Instruction: AcceptLoan");
             process_accept_loan(program_id, accounts)
+        }
+        LoanInstruction::RepayLoan => {
+            msg!("Instruction: RepayLoan");
+            process_repay_loan(program_id, accounts)
         }
     }
 }
@@ -257,7 +266,7 @@ pub fn process_accept_loan(
         return Err(LoanError::NotAuthorized.into());
     }
     // fail if loan transfer account balance is not sufficient
-    if lender_loan_transfer_info.lamports() < loan_data.amount {
+    if lender_loan_transfer_info.lamports() < loan_data.expected_amount {
         return Err(ProgramError::InsufficientFunds);
     }
     let amount: u64 = loan_data.expected_amount;
@@ -309,6 +318,105 @@ pub fn process_accept_loan(
             lender_info.clone(),
             token_program.clone(),
         ],
+    )?;
+
+    Ok(())
+}
+
+pub fn process_repay_loan(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+) -> ProgramResult {
+    let account_info_iter = &mut accounts.iter();
+    // get the payer and assert that they can sign
+    let payer_info = next_account_info(account_info_iter)?;
+    if !payer_info.is_signer {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+    // get the accounts
+    let payer_token_account_info = next_account_info(account_info_iter)?;
+    let guarantor_account_info = next_account_info(account_info_iter)?;
+    let collateral_token_account_info = next_account_info(account_info_iter)?;
+    let lender_account_info = next_account_info(account_info_iter)?;
+    let lender_token_account_info = next_account_info(account_info_iter)?;
+    let loan_account_info = next_account_info(account_info_iter)?;
+
+    // get the loan data
+    let mut loan_data = Loan::unpack(&loan_account_info.data.borrow())?;
+    // fail is loan is not initialized
+    if !loan_data.is_initialized() {
+        return Err(ProgramError::UninitializedAccount);
+    }
+    // fail if repayment transfer account balance is not sufficient
+    if payer_token_account_info.lamports() < loan_data.amount {
+        return Err(ProgramError::InsufficientFunds);
+    }
+    // Ensure we have the right account to send guarantor funds to
+    let guarantor_account_option = Some(*guarantor_account_info.key);
+    let guarantor_account_c_option: COption<Pubkey> = guarantor_account_option.into();
+    if guarantor_account_c_option != loan_data.guarantor_pubkey {
+        return Err(LoanError::NotAuthorized.into());
+    }
+    let collateral_token_account_option = Some(*collateral_token_account_info.key);
+    let collateral_token_account_c_option: COption<Pubkey> = collateral_token_account_option.into();
+    if collateral_token_account_c_option != loan_data.collateral_account_pubkey {
+        return Err(LoanError::NotAuthorized.into());
+    }
+    // Ensure we have the right account to send repaid funds to
+    let lender_account_option = Some(*lender_account_info.key);
+    let lender_account_c_option: COption<Pubkey> = lender_account_option.into();
+    if lender_account_c_option != loan_data.lender_pubkey {
+        return Err(LoanError::NotAuthorized.into());
+    }
+    let lender_token_option = Some(*lender_token_account_info.key);
+    let lender_token_c_option: COption<Pubkey> = lender_token_option.into();
+    if lender_token_c_option != loan_data.lender_loan_repayment_pubkey {
+        return Err(LoanError::NotAuthorized.into());
+    }
+    // update loan info
+    msg!("Updating loan information...");
+    loan_data.status = LoanStatus::Repaid as u8;
+    Loan::pack(loan_data, &mut loan_account_info.data.borrow_mut())?;
+    // change the owner of the payer repayment account to be the original lender
+    let pda_account_info = next_account_info(account_info_iter)?;
+    let token_program = next_account_info(account_info_iter)?;
+    let repay_loan_ix = spl_token::instruction::set_authority(
+        token_program.key,
+        payer_token_account_info.key,
+        Some(lender_account_info.key),
+        spl_token::instruction::AuthorityType::AccountOwner,
+        payer_info.key,
+        &[&payer_info.key],
+    )?;
+    msg!("Calling the token program to repay the loan...");
+    invoke(
+        &repay_loan_ix,
+        &[
+            payer_token_account_info.clone(),
+            payer_info.clone(),
+            token_program.clone(),
+        ],
+    )?;
+    // change the owner of the collateral account to be the original guarantor
+    let (pda, nonce) = Pubkey::find_program_address(&[b"loan"], program_id);
+    let repay_loan_ix = spl_token::instruction::set_authority(
+        token_program.key,
+        collateral_token_account_info.key,
+        Some(guarantor_account_info.key),
+        spl_token::instruction::AuthorityType::AccountOwner,
+        &pda,
+        &[&pda],
+    )?;
+    msg!("Calling the token program to repay the loan...");
+    invoke_signed(
+        &repay_loan_ix,
+        &[
+            collateral_token_account_info.clone(),
+            guarantor_account_info.clone(),
+            pda_account_info.clone(),
+            token_program.clone(),
+        ],
+        &[&[&b"loan"[..], &[nonce]]],
     )?;
 
     Ok(())
