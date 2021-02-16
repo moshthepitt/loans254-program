@@ -28,6 +28,9 @@ pub enum LoanInstruction {
         amount: u64
     },
     /// Guarantee a loan
+    ///
+    /// Accounts expected:
+    ///
     /// Basically meant to be a mechanism through which collateral is provided for a loan
     /// This could be by a third party of by the borrower
     ///
@@ -38,6 +41,9 @@ pub enum LoanInstruction {
     /// 5. `[]` The token program
     GuaranteeLoan,
     /// Accept the loan
+    ///
+    /// Accounts expected:
+    ///
     /// Basically, sends money to the borrower, from the lender
     /// 0. `[signer]` The account of the person lending the money
     /// 1. `[writable]` Token account that whose funds will be transferred to borrower
@@ -47,6 +53,20 @@ pub enum LoanInstruction {
     /// 5. `[]` The rent sysvar
     /// 6. `[]` The token program
     AcceptLoan,
+    /// Repay the loan
+    ///
+    /// Accounts expected:
+    ///
+    /// 0. `[signer]` The account of the person repaying the loan
+    /// 1. `[writable]` The payer's token account that has the funds being repaid
+    /// 2. `[writable]` The guarantor's account
+    /// 3. `[writable]` The guarantor's token account to be returned to guarantor
+    /// 4. `[writable]` The lender's account
+    /// 5. `[writable]` The lender's token account that will receive the repaid loan
+    /// 6. `[writable]` The loan account, has information about the loan
+    /// 7. `[]` The PDA account
+    /// 8. `[]` The token program
+    RepayLoan,
 }
 
 impl LoanInstruction {
