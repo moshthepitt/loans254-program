@@ -12,7 +12,8 @@ pub enum LoanStatus {
     Initialized = 1,
     Guaranteed = 2,
     Accepted = 3,
-    Cancelled = 4,
+    Repaid = 4,
+    Cancelled = 7,
 }
 
 pub struct Loan {
@@ -22,6 +23,7 @@ pub struct Loan {
     pub temp_token_account_pubkey: Pubkey,  // this account holds loan processing fee
     pub borrower_loan_receive_pubkey: Pubkey, // loan amount will be sent here if successful
     pub guarantor_pubkey: COption<Pubkey>, // the person providing collateral for the loans
+    pub collateral_account_pubkey: COption<Pubkey>, // the token account that holds the collateral
     pub lender_pubkey: COption<Pubkey>, // the person providing the loans
     pub lender_loan_repayment_pubkey: COption<Pubkey>, // the person providing the loans
     pub expected_amount: u64,  // the expected loan amount
@@ -39,7 +41,7 @@ impl IsInitialized for Loan {
 }
 
 impl Pack for Loan {
-    const LEN: usize = 230;
+    const LEN: usize = 266;
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
         let src = array_ref![src, 0, Loan::LEN];
         let (
@@ -49,13 +51,14 @@ impl Pack for Loan {
             temp_token_account_pubkey,
             borrower_loan_receive_pubkey,
             guarantor_pubkey,
+            collateral_account_pubkey,
             lender_pubkey,
             lender_loan_repayment_pubkey,
             expected_amount,
             amount,
             interest_rate,
             duration,
-        ) = array_refs![src, 1, 1, 32, 32, 32, 36, 36, 36, 8, 8, 4, 4];
+        ) = array_refs![src, 1, 1, 32, 32, 32, 36, 36, 36, 36, 8, 8, 4, 4];
         let is_initialized = match is_initialized {
             [0] => false,
             [1] => true,
@@ -69,6 +72,7 @@ impl Pack for Loan {
             temp_token_account_pubkey: Pubkey::new_from_array(*temp_token_account_pubkey),
             borrower_loan_receive_pubkey: Pubkey::new_from_array(*borrower_loan_receive_pubkey),
             guarantor_pubkey: unpack_coption_key(guarantor_pubkey)?,
+            collateral_account_pubkey: unpack_coption_key(collateral_account_pubkey)?,
             lender_pubkey: unpack_coption_key(lender_pubkey)?,
             lender_loan_repayment_pubkey: unpack_coption_key(lender_loan_repayment_pubkey)?,
             expected_amount: u64::from_le_bytes(*expected_amount),
@@ -87,13 +91,14 @@ impl Pack for Loan {
             temp_token_account_pubkey_dst,
             borrower_loan_receive_pubkey_dst,
             guarantor_pubkey_dst,
+            collateral_account_pubkey_dst,
             lender_pubkey_dst,
             lender_loan_repayment_pubkey_dst,
             expected_amount_dst,
             amount_dst,
             interest_rate_dst,
             duration_dst,
-        ) = mut_array_refs![dst, 1, 1, 32, 32, 32, 36, 36, 36, 8, 8, 4, 4];
+        ) = mut_array_refs![dst, 1, 1, 32, 32, 32, 36, 36, 36, 36, 8, 8, 4, 4];
 
         let Loan {
             is_initialized,
@@ -102,6 +107,7 @@ impl Pack for Loan {
             temp_token_account_pubkey,
             borrower_loan_receive_pubkey,
             guarantor_pubkey,
+            collateral_account_pubkey,
             lender_pubkey,
             lender_loan_repayment_pubkey,
             expected_amount,
@@ -116,6 +122,7 @@ impl Pack for Loan {
         temp_token_account_pubkey_dst.copy_from_slice(temp_token_account_pubkey.as_ref());
         borrower_loan_receive_pubkey_dst.copy_from_slice(borrower_loan_receive_pubkey.as_ref());
         pack_coption_key(guarantor_pubkey, guarantor_pubkey_dst);
+        pack_coption_key(collateral_account_pubkey, collateral_account_pubkey_dst);
         pack_coption_key(lender_pubkey, lender_pubkey_dst);
         pack_coption_key(lender_loan_repayment_pubkey, lender_loan_repayment_pubkey_dst);
         *expected_amount_dst = expected_amount.to_le_bytes();
