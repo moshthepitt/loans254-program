@@ -81,9 +81,6 @@ pub fn process_init_loan(
 
     // get the temp token account owned by the initializer
     let temp_token_account = next_account_info(account_info_iter)?;
-    if *temp_token_account.owner != *initializer.key {
-        return Err(LoanError::NotAuthorized.into());
-    }
 
     // the account that will receive the loan if it goes through
     // ensure that it is owned by the program
