@@ -36,9 +36,9 @@ pub enum LoanInstruction {
     ///
     /// 0. `[signer]` The account of the person guaranteeing the loan
     /// 1. `[writable]` Token account that holds the collateral.  Should be owned by guarantor
-    /// 3. `[writable]` The loan account, has information about the loan
-    /// 4. `[]` The rent sysvar
-    /// 5. `[]` The token program
+    /// 2. `[writable]` The loan account, has information about the loan
+    /// 3. `[]` The rent sysvar
+    /// 4. `[]` The token program
     GuaranteeLoan,
     /// Accept the loan
     ///
@@ -47,7 +47,7 @@ pub enum LoanInstruction {
     /// Basically, sends money to the borrower, from the lender
     /// 0. `[signer]` The account of the person lending the money
     /// 1. `[writable]` Token account that whose funds will be transferred to borrower
-    /// 2. `[]` The lender's token account for the token they will receive should when loan is repaid
+    /// 2. `[writable]` The lender's token account for the token they will receive should when loan is repaid
     /// 3. `[writable]` The borrower's token account to receive the borrowed loan amount
     /// 4. `[writable]` The loan account, has information about the loan
     /// 5. `[]` The rent sysvar
