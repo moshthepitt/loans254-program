@@ -78,6 +78,9 @@ impl LoanInstruction {
             0 => Self::InitLoan {
                 amount: Self::unpack_amount(rest)?,
             },
+            1 => Self::GuaranteeLoan,
+            2 => Self::AcceptLoan,
+            3 => Self::RepayLoan,
             _ => return Err(InvalidInstruction.into()),
         })
     }
