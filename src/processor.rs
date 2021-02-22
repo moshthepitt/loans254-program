@@ -160,9 +160,7 @@ pub fn process_guarantee_loan(
     }
     // get the collateral_account owned by the guarantor
     let collateral_account_info = next_account_info(account_info_iter)?;
-    if *collateral_account_info.owner != *guarantor_info.key {
-        return Err(LoanError::NotAuthorized.into());
-    }
+
     // get the loan account and assert that it is owned by the program
     let loan_account_info = next_account_info(account_info_iter)?;
     if *loan_account_info.owner != *program_id {
@@ -175,7 +173,7 @@ pub fn process_guarantee_loan(
     }
     // get the loan data
     let mut loan_data = Loan::unpack(&loan_account_info.data.borrow())?;
-    // fail is loan is not initialized
+    // fail if loan is not initialized
     if !loan_data.is_initialized() {
         return Err(ProgramError::UninitializedAccount);
     }
