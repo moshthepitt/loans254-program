@@ -225,9 +225,7 @@ pub fn process_accept_loan(
     }
     // get the loan transfer account owned by the lender
     let lender_loan_transfer_info = next_account_info(account_info_iter)?;
-    if *lender_loan_transfer_info.owner != *lender_info.key {
-        return Err(LoanError::NotAuthorized.into());
-    }
+
     // the account that will receive the loan when it is repaid
     let lender_repayment_account_info = next_account_info(account_info_iter)?;
     if *lender_repayment_account_info.owner != spl_token::id() {
@@ -247,7 +245,7 @@ pub fn process_accept_loan(
         return Err(LoanError::NotRentExempt.into());
     }
     // confirm the loan repayment account is rent exempt
-    if !rent.is_exempt(lender_repayment_account_info.lamports(), loan_account_info.data_len()) {
+    if !rent.is_exempt(lender_repayment_account_info.lamports(), lender_repayment_account_info.data_len()) {
         return Err(LoanError::NotRentExempt.into());
     }
     // get the loan data
@@ -293,9 +291,7 @@ pub fn process_accept_loan(
             token_program.clone(),
         ],
     )?;
-    // change the owner of the loan transfer account to be the borrower
-    // essentially the borrower now gets the funds
-    let token_program = next_account_info(account_info_iter)?;
+    // transfer the funds to the borrower
     let transfer_to_initializer_ix = spl_token::instruction::transfer(
         token_program.key,
         lender_loan_transfer_info.key,
