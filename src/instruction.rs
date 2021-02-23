@@ -61,12 +61,13 @@ pub enum LoanInstruction {
     /// 0. `[signer]` The account of the person repaying the loan
     /// 1. `[writable]` The payer's token account that has the funds being repaid
     /// 2. `[writable]` The guarantor's account
-    /// 3. `[writable]` The guarantor's token account to be returned to guarantor
-    /// 4. `[writable]` The lender's account
-    /// 5. `[writable]` The lender's token account that will receive the repaid loan
-    /// 6. `[writable]` The loan account, has information about the loan
-    /// 7. `[]` The PDA account
-    /// 8. `[]` The token program
+    /// 3. `[writable]` The collateral account to be returned to guarantor
+    /// 4. `[writable]` The guarantor's token account to be returned to guarantor
+    /// 5. `[writable]` The lender's account
+    /// 6. `[writable]` The lender's token account that will receive the repaid loan
+    /// 7. `[writable]` The loan account, has information about the loan
+    /// 8. `[]` The PDA account
+    /// 9. `[]` The token program
     RepayLoan,
 }
 
