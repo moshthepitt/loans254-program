@@ -12,32 +12,6 @@ use solana_program::{
 use crate::{instruction::LoanInstruction, error::LoanError, state::{Loan, LoanStatus}};
 use crate::{utils::{get_borrowed_amount, get_duration, get_interest_rate}};
 
-pub struct Processor;
-impl Processor {
-    pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
-        let instruction = LoanInstruction::unpack(instruction_data)?;
-
-        match instruction {
-            LoanInstruction::InitLoan { amount } => {
-                msg!("Instruction: InitLoan");
-                process_init_loan(program_id, accounts, amount)
-            }
-            LoanInstruction::GuaranteeLoan => {
-                msg!("Instruction: GuaranteeLoan");
-                process_guarantee_loan(program_id, accounts)
-            }
-            LoanInstruction::AcceptLoan => {
-                msg!("Instruction: AcceptLoan");
-                process_accept_loan(program_id, accounts)
-            }
-            LoanInstruction::RepayLoan => {
-                msg!("Instruction: RepayLoan");
-                process_repay_loan(program_id, accounts)
-            }
-        }
-    }
-}
-
 /// Processes an instruction
 pub fn process_instruction(
     program_id: &Pubkey,
