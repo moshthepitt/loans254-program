@@ -160,6 +160,8 @@ pub fn process_guarantee_loan(
     }
     // get the collateral_account owned by the guarantor
     let collateral_account_info = next_account_info(account_info_iter)?;
+    // get the collateral_account owned by the guarantor
+    let guarantor_payment_account_info = next_account_info(account_info_iter)?;
 
     // get the loan account and assert that it is owned by the program
     let loan_account_info = next_account_info(account_info_iter)?;
@@ -181,17 +183,23 @@ pub fn process_guarantee_loan(
     if collateral_account_info.lamports() < loan_data.amount {
         return Err(ProgramError::InsufficientFunds);
     }
+    // fail if guarantor_payment_account_info is not rent-exempt
+    if !rent.is_exempt(guarantor_payment_account_info.lamports(), guarantor_payment_account_info.data_len()) {
+        return Err(LoanError::NotRentExempt.into());
+    }
     // update loan info
-    msg!("Updating loan information...");
+    msg!("Updating loan information with guarantor details...");
     loan_data.status = LoanStatus::Guaranteed as u8;
     loan_data.guarantor_pubkey = Some(*guarantor_info.key).into();
+    loan_data.guarantor_repayment_pubkey = Some(*guarantor_payment_account_info.key).into();
+    loan_data.collateral_account_pubkey = Some(*collateral_account_info.key).into();
     Loan::pack(loan_data, &mut loan_account_info.data.borrow_mut())?;
     // get the program derived address
     let (pda, _bump_seed) = Pubkey::find_program_address(&[b"loan"], program_id);
     // change the owner of the collateral account to be the pda
     // essentially the program now fully controls the loan collateral
     let token_program = next_account_info(account_info_iter)?;
-    let owner_change_ix = spl_token::instruction::set_authority(
+    let collateral_acc_owner_change_ix = spl_token::instruction::set_authority(
         token_program.key,
         collateral_account_info.key,
         Some(&pda),
@@ -201,9 +209,29 @@ pub fn process_guarantee_loan(
     )?;
     msg!("Calling the token program to transfer collateral account ownership...");
     invoke(
-        &owner_change_ix,
+        &collateral_acc_owner_change_ix,
         &[
             collateral_account_info.clone(),
+            guarantor_info.clone(),
+            token_program.clone(),
+        ],
+    )?;
+    // similar change the ownership of the repayment account to be owned by
+    // program.  This prevents future errors e.g. we don't want the account
+    // deleted by the time we try to repay
+    let guarantor_payment_acc_owner_change_ix = spl_token::instruction::set_authority(
+        token_program.key,
+        guarantor_payment_account_info.key,
+        Some(&pda),
+        spl_token::instruction::AuthorityType::AccountOwner,
+        guarantor_info.key,
+        &[&guarantor_info.key],
+    )?;
+    msg!("Calling the token program to transfer guarantor payment account ownership...");
+    invoke(
+        &guarantor_payment_acc_owner_change_ix,
+        &[
+            guarantor_payment_account_info.clone(),
             guarantor_info.clone(),
             token_program.clone(),
         ],
@@ -264,7 +292,7 @@ pub fn process_accept_loan(
     }
     let amount: u64 = loan_data.expected_amount;
     // update loan info
-    msg!("Updating loan information...");
+    msg!("Updating loan information with lender details...");
     loan_data.status = LoanStatus::Accepted as u8;
     loan_data.lender_pubkey = Some(*lender_info.key).into();
     loan_data.lender_repayment_pubkey = Some(*lender_repayment_account_info.key).into();
@@ -365,7 +393,7 @@ pub fn process_repay_loan(
         return Err(LoanError::NotAuthorized.into());
     }
     // update loan info
-    msg!("Updating loan information...");
+    msg!("Updating loan information, setting status to repaid...");
     loan_data.status = LoanStatus::Repaid as u8;
     Loan::pack(loan_data, &mut loan_account_info.data.borrow_mut())?;
 
