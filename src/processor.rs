@@ -267,7 +267,7 @@ pub fn process_accept_loan(
     msg!("Updating loan information...");
     loan_data.status = LoanStatus::Accepted as u8;
     loan_data.lender_pubkey = Some(*lender_info.key).into();
-    loan_data.lender_loan_repayment_pubkey = Some(*lender_repayment_account_info.key).into();
+    loan_data.lender_repayment_pubkey = Some(*lender_repayment_account_info.key).into();
     Loan::pack(loan_data, &mut loan_account_info.data.borrow_mut())?;
     // change the owner of the loan repayment info account to be the pda
     // essentially the program now fully controls the loan repayment account
@@ -361,7 +361,7 @@ pub fn process_repay_loan(
     }
     let lender_token_option = Some(*lender_token_account_info.key);
     let lender_token_c_option: COption<Pubkey> = lender_token_option.into();
-    if lender_token_c_option != loan_data.lender_loan_repayment_pubkey {
+    if lender_token_c_option != loan_data.lender_repayment_pubkey {
         return Err(LoanError::NotAuthorized.into());
     }
     // update loan info

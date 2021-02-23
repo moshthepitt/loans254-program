@@ -186,5 +186,5 @@ async fn test_process_init_loan() {
     // let c_option: COption<Pubkey> = option.into();
     assert_eq!(false, load_data.guarantor_pubkey.is_some());
     assert_eq!(false, load_data.lender_pubkey.is_some());
-    assert_eq!(false, load_data.lender_loan_repayment_pubkey.is_some());
+    assert_eq!(false, load_data.lender_repayment_pubkey.is_some());
 }

@@ -25,7 +25,7 @@ pub struct Loan {
     pub guarantor_pubkey: COption<Pubkey>, // the person providing collateral for the loans
     pub collateral_account_pubkey: COption<Pubkey>, // the token account that holds the collateral
     pub lender_pubkey: COption<Pubkey>, // the person providing the loans
-    pub lender_loan_repayment_pubkey: COption<Pubkey>, // the person providing the loans
+    pub lender_repayment_pubkey: COption<Pubkey>, // the person providing the loans
     pub expected_amount: u64,  // the expected loan amount
     pub amount: u64,  // the loan amount including interest
     pub interest_rate: u32,  // the loan interest rate annualized.  Note that this is an unsigned int so something like 9 would actually represent 9/100 interest rate
@@ -53,7 +53,7 @@ impl Pack for Loan {
             guarantor_pubkey,
             collateral_account_pubkey,
             lender_pubkey,
-            lender_loan_repayment_pubkey,
+            lender_repayment_pubkey,
             expected_amount,
             amount,
             interest_rate,
@@ -74,7 +74,7 @@ impl Pack for Loan {
             guarantor_pubkey: unpack_coption_key(guarantor_pubkey)?,
             collateral_account_pubkey: unpack_coption_key(collateral_account_pubkey)?,
             lender_pubkey: unpack_coption_key(lender_pubkey)?,
-            lender_loan_repayment_pubkey: unpack_coption_key(lender_loan_repayment_pubkey)?,
+            lender_repayment_pubkey: unpack_coption_key(lender_repayment_pubkey)?,
             expected_amount: u64::from_le_bytes(*expected_amount),
             amount: u64::from_le_bytes(*amount),
             interest_rate: u32::from_le_bytes(*interest_rate),
@@ -93,7 +93,7 @@ impl Pack for Loan {
             guarantor_pubkey_dst,
             collateral_account_pubkey_dst,
             lender_pubkey_dst,
-            lender_loan_repayment_pubkey_dst,
+            lender_repayment_pubkey_dst,
             expected_amount_dst,
             amount_dst,
             interest_rate_dst,
@@ -109,7 +109,7 @@ impl Pack for Loan {
             guarantor_pubkey,
             collateral_account_pubkey,
             lender_pubkey,
-            lender_loan_repayment_pubkey,
+            lender_repayment_pubkey,
             expected_amount,
             amount,
             interest_rate,
@@ -124,7 +124,7 @@ impl Pack for Loan {
         pack_coption_key(guarantor_pubkey, guarantor_pubkey_dst);
         pack_coption_key(collateral_account_pubkey, collateral_account_pubkey_dst);
         pack_coption_key(lender_pubkey, lender_pubkey_dst);
-        pack_coption_key(lender_loan_repayment_pubkey, lender_loan_repayment_pubkey_dst);
+        pack_coption_key(lender_repayment_pubkey, lender_repayment_pubkey_dst);
         *expected_amount_dst = expected_amount.to_le_bytes();
         *amount_dst = amount.to_le_bytes();
         *interest_rate_dst = interest_rate.to_le_bytes();
