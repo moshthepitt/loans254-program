@@ -174,7 +174,7 @@ async fn test_process_init_loan() {
     };
     assert_eq!(true, load_data.is_initialized);
     assert_eq!(account_key, load_data.initializer_pubkey);
-    assert_eq!(*temp_token_vault.key, load_data.temp_token_account_pubkey);
+    assert_eq!(*temp_token_vault.key, load_data.application_fee_account_pubkey);
     assert_eq!(*receiving_token_vault.key, load_data.borrower_loan_receive_pubkey);
     assert_eq!(13337, load_data.expected_amount);
     assert_eq!(9, load_data.interest_rate);

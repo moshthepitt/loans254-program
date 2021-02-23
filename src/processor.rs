@@ -80,7 +80,7 @@ pub fn process_init_loan(
     }
 
     // get the temp token account owned by the initializer
-    let temp_token_account = next_account_info(account_info_iter)?;
+    let application_fee_account = next_account_info(account_info_iter)?;
 
     // the account that will receive the loan if it goes through
     // ensure that it is owned by the program
@@ -113,7 +113,7 @@ pub fn process_init_loan(
     loan_info.is_initialized = true;
     loan_info.status = LoanStatus::Initialized as u8;
     loan_info.initializer_pubkey = *initializer.key;
-    loan_info.temp_token_account_pubkey = *temp_token_account.key;
+    loan_info.application_fee_account_pubkey = *application_fee_account.key;
     loan_info.borrower_loan_receive_pubkey = *token_to_receive_account.key;
     loan_info.expected_amount = amount;
     loan_info.interest_rate = get_interest_rate(&initializer.key,  amount);
@@ -123,12 +123,12 @@ pub fn process_init_loan(
 
     // get the program derived address
     let (pda, _bump_seed) = Pubkey::find_program_address(&[b"loan"], program_id);
-    // change the owner of the temp_token_account to be the pda
+    // change the owner of the application_fee_account to be the pda
     // essentially the program now fully controls the loan application fees
     let token_program = next_account_info(account_info_iter)?;
     let owner_change_ix = spl_token::instruction::set_authority(
         token_program.key,
-        temp_token_account.key,
+        application_fee_account.key,
         Some(&pda),
         spl_token::instruction::AuthorityType::AccountOwner,
         initializer.key,
@@ -139,7 +139,7 @@ pub fn process_init_loan(
     invoke(
         &owner_change_ix,
         &[
-            temp_token_account.clone(),
+            application_fee_account.clone(),
             initializer.clone(),
             token_program.clone(),
         ],
@@ -368,6 +368,14 @@ pub fn process_repay_loan(
     msg!("Updating loan information...");
     loan_data.status = LoanStatus::Repaid as u8;
     Loan::pack(loan_data, &mut loan_account_info.data.borrow_mut())?;
+
+    // we need to share payer_token_account_info between:
+    // program
+    // collateral provider
+    // lender
+    // then close all temp token accounts
+    // send loan application fee to program
+
     // change the owner of the payer repayment account to be the original lender
     let pda_account_info = next_account_info(account_info_iter)?;
     let token_program = next_account_info(account_info_iter)?;
@@ -379,7 +387,7 @@ pub fn process_repay_loan(
         payer_info.key,
         &[&payer_info.key],
     )?;
-    msg!("Calling the token program to repay the loan...");
+    msg!("Calling the token program to return funds to the loan...");
     invoke(
         &repay_loan_ix,
         &[
@@ -390,7 +398,7 @@ pub fn process_repay_loan(
     )?;
     // change the owner of the collateral account to be the original guarantor
     let (pda, nonce) = Pubkey::find_program_address(&[b"loan"], program_id);
-    let repay_loan_ix = spl_token::instruction::set_authority(
+    let return_collateral_ix = spl_token::instruction::set_authority(
         token_program.key,
         collateral_token_account_info.key,
         Some(guarantor_account_info.key),
@@ -398,9 +406,9 @@ pub fn process_repay_loan(
         &pda,
         &[&pda],
     )?;
-    msg!("Calling the token program to repay the loan...");
+    msg!("Calling the token program to return funds to the guarantor...");
     invoke_signed(
-        &repay_loan_ix,
+        &return_collateral_ix,
         &[
             collateral_token_account_info.clone(),
             guarantor_account_info.clone(),
