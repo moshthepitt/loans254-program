@@ -10,7 +10,23 @@ pub fn get_interest_rate(
     _borrower: &Pubkey,
     _loan_amount: u64,
 ) -> u32 {
-    return 9;
+    return 9;  // 9%
+}
+
+/// get the share paid out to the guarantor
+pub fn get_guarantor_share(
+    _guarantor: &Pubkey,
+    _loan_amount: u64,
+) -> u32 {
+    return 50;  // 50%
+}
+
+/// get the share paid our to the lender
+pub fn get_lender_share(
+    _lender: &Pubkey,
+    _loan_amount: u64,
+) -> u32 {
+    return 50;  // 50%
 }
 
 /// get the loan duration

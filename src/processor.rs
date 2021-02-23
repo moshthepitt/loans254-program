@@ -10,7 +10,14 @@ use solana_program::{
     program::{invoke, invoke_signed},
 };
 use crate::{instruction::LoanInstruction, error::LoanError, state::{Loan, LoanStatus}};
-use crate::{utils::{get_borrowed_amount, get_duration, get_interest_rate}};
+use crate::{utils::{
+    get_borrowed_amount,
+    get_duration,
+    get_interest_rate,
+    get_guarantor_share,
+    get_lender_share,
+    get_processing_fee,
+}};
 
 pub struct Processor;
 impl Processor {
@@ -355,6 +362,7 @@ pub fn process_repay_loan(
     // get the accounts
     let payer_token_account_info = next_account_info(account_info_iter)?;
     let guarantor_account_info = next_account_info(account_info_iter)?;
+    let guarantor_token_account_info = next_account_info(account_info_iter)?;
     let collateral_token_account_info = next_account_info(account_info_iter)?;
     let lender_account_info = next_account_info(account_info_iter)?;
     let lender_token_account_info = next_account_info(account_info_iter)?;
@@ -376,6 +384,11 @@ pub fn process_repay_loan(
     if guarantor_account_c_option != loan_data.guarantor_pubkey {
         return Err(LoanError::NotAuthorized.into());
     }
+    let guarantor_token_account_option = Some(*guarantor_token_account_info.key);
+    let guarantor_token_account_c_option: COption<Pubkey> = guarantor_token_account_option.into();
+    if guarantor_token_account_c_option != loan_data.guarantor_repayment_pubkey {
+        return Err(LoanError::NotAuthorized.into());
+    }
     let collateral_token_account_option = Some(*collateral_token_account_info.key);
     let collateral_token_account_c_option: COption<Pubkey> = collateral_token_account_option.into();
     if collateral_token_account_c_option != loan_data.collateral_account_pubkey {
@@ -392,17 +405,21 @@ pub fn process_repay_loan(
     if lender_token_c_option != loan_data.lender_repayment_pubkey {
         return Err(LoanError::NotAuthorized.into());
     }
+    // calculate repayments
+    let loan_interest = loan_data.amount - loan_data.expected_amount;
+    let program_share = loan_interest * (u64::from(get_processing_fee(
+        &loan_data.initializer_pubkey,
+        loan_data.expected_amount,
+        loan_data.duration,
+        loan_data.interest_rate
+    )) / 100);
+    let lender_share = (loan_interest - program_share) * (u64::from(get_lender_share(lender_account_info.key, loan_data.amount)) / 100);
+    let total_lender_share = lender_share + loan_data.expected_amount;
+    let guarantor_share = (loan_interest - program_share) * (u64::from(get_guarantor_share(guarantor_account_info.key, loan_data.amount)) / 100);
     // update loan info
     msg!("Updating loan information, setting status to repaid...");
     loan_data.status = LoanStatus::Repaid as u8;
     Loan::pack(loan_data, &mut loan_account_info.data.borrow_mut())?;
-
-    // we need to share payer_token_account_info between:
-    // program
-    // collateral provider
-    // lender
-    // then close all temp token accounts
-    // send loan application fee to program
 
     // change the owner of the payer repayment account to be the original lender
     let pda_account_info = next_account_info(account_info_iter)?;
@@ -424,8 +441,48 @@ pub fn process_repay_loan(
             token_program.clone(),
         ],
     )?;
-    // change the owner of the collateral account to be the original guarantor
+    // transfer the funds to the guarantor
+    let transfer_to_guarantor_ix = spl_token::instruction::transfer(
+        token_program.key,
+        payer_token_account_info.key,
+        guarantor_token_account_info.key,
+        payer_info.key,
+        &[&payer_info.key],
+        guarantor_share,
+    )?;
+    msg!("Calling the token program to pay the guarantor...");
+    invoke(
+        &transfer_to_guarantor_ix,
+        &[
+            payer_token_account_info.clone(),
+            guarantor_token_account_info.clone(),
+            payer_info.clone(),
+            token_program.clone(),
+        ],
+    )?;
+
+    // transfer the funds to the lender
+    let transfer_to_lender_ix = spl_token::instruction::transfer(
+        token_program.key,
+        payer_token_account_info.key,
+        lender_token_account_info.key,
+        payer_info.key,
+        &[&payer_info.key],
+        total_lender_share,
+    )?;
+    msg!("Calling the token program to pay the lender...");
+    invoke(
+        &transfer_to_lender_ix,
+        &[
+            payer_token_account_info.clone(),
+            lender_token_account_info.clone(),
+            payer_info.clone(),
+            token_program.clone(),
+        ],
+    )?;
+    // get pda and nonce
     let (pda, nonce) = Pubkey::find_program_address(&[b"loan"], program_id);
+    // change the owner of the collateral account to be the original guarantor
     let return_collateral_ix = spl_token::instruction::set_authority(
         token_program.key,
         collateral_token_account_info.key,
@@ -445,6 +502,8 @@ pub fn process_repay_loan(
         ],
         &[&[&b"loan"[..], &[nonce]]],
     )?;
+
+    // TODO: transfer application fee + program share to program owner address
 
     Ok(())
 }
