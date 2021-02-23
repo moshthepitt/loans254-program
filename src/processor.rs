@@ -135,7 +135,7 @@ pub fn process_init_loan(
         &[&initializer.key],
     )?;
 
-    msg!("Calling the token program to transfer token account ownership...");
+    msg!("Calling the token program to transfer application fee account ownership...");
     invoke(
         &owner_change_ix,
         &[
