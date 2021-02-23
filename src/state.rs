@@ -23,9 +23,10 @@ pub struct Loan {
     pub application_fee_account_pubkey: Pubkey,  // this account holds loan processing fee
     pub borrower_loan_receive_pubkey: Pubkey, // loan amount will be sent here if successful
     pub guarantor_pubkey: COption<Pubkey>, // the person providing collateral for the loans
+    pub guarantor_repayment_pubkey: COption<Pubkey>, // account to repay the guarantor
     pub collateral_account_pubkey: COption<Pubkey>, // the token account that holds the collateral
     pub lender_pubkey: COption<Pubkey>, // the person providing the loans
-    pub lender_repayment_pubkey: COption<Pubkey>, // the person providing the loans
+    pub lender_repayment_pubkey: COption<Pubkey>, // account to repay the lender
     pub expected_amount: u64,  // the expected loan amount
     pub amount: u64,  // the loan amount including interest
     pub interest_rate: u32,  // the loan interest rate annualized.  Note that this is an unsigned int so something like 9 would actually represent 9/100 interest rate
@@ -41,7 +42,7 @@ impl IsInitialized for Loan {
 }
 
 impl Pack for Loan {
-    const LEN: usize = 266;
+    const LEN: usize = 302;
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
         let src = array_ref![src, 0, Loan::LEN];
         let (
@@ -51,6 +52,7 @@ impl Pack for Loan {
             application_fee_account_pubkey,
             borrower_loan_receive_pubkey,
             guarantor_pubkey,
+            guarantor_repayment_pubkey,
             collateral_account_pubkey,
             lender_pubkey,
             lender_repayment_pubkey,
@@ -58,7 +60,7 @@ impl Pack for Loan {
             amount,
             interest_rate,
             duration,
-        ) = array_refs![src, 1, 1, 32, 32, 32, 36, 36, 36, 36, 8, 8, 4, 4];
+        ) = array_refs![src, 1, 1, 32, 32, 32, 36, 36, 36, 36, 36, 8, 8, 4, 4];
         let is_initialized = match is_initialized {
             [0] => false,
             [1] => true,
@@ -72,6 +74,7 @@ impl Pack for Loan {
             application_fee_account_pubkey: Pubkey::new_from_array(*application_fee_account_pubkey),
             borrower_loan_receive_pubkey: Pubkey::new_from_array(*borrower_loan_receive_pubkey),
             guarantor_pubkey: unpack_coption_key(guarantor_pubkey)?,
+            guarantor_repayment_pubkey: unpack_coption_key(guarantor_repayment_pubkey)?,
             collateral_account_pubkey: unpack_coption_key(collateral_account_pubkey)?,
             lender_pubkey: unpack_coption_key(lender_pubkey)?,
             lender_repayment_pubkey: unpack_coption_key(lender_repayment_pubkey)?,
@@ -91,6 +94,7 @@ impl Pack for Loan {
             application_fee_account_pubkey_dst,
             borrower_loan_receive_pubkey_dst,
             guarantor_pubkey_dst,
+            guarantor_repayment_pubkey_dst,
             collateral_account_pubkey_dst,
             lender_pubkey_dst,
             lender_repayment_pubkey_dst,
@@ -98,7 +102,7 @@ impl Pack for Loan {
             amount_dst,
             interest_rate_dst,
             duration_dst,
-        ) = mut_array_refs![dst, 1, 1, 32, 32, 32, 36, 36, 36, 36, 8, 8, 4, 4];
+        ) = mut_array_refs![dst, 1, 1, 32, 32, 32, 36, 36, 36, 36, 36, 8, 8, 4, 4];
 
         let Loan {
             is_initialized,
@@ -107,6 +111,7 @@ impl Pack for Loan {
             application_fee_account_pubkey,
             borrower_loan_receive_pubkey,
             guarantor_pubkey,
+            guarantor_repayment_pubkey,
             collateral_account_pubkey,
             lender_pubkey,
             lender_repayment_pubkey,
@@ -122,6 +127,7 @@ impl Pack for Loan {
         application_fee_account_pubkey_dst.copy_from_slice(application_fee_account_pubkey.as_ref());
         borrower_loan_receive_pubkey_dst.copy_from_slice(borrower_loan_receive_pubkey.as_ref());
         pack_coption_key(guarantor_pubkey, guarantor_pubkey_dst);
+        pack_coption_key(guarantor_repayment_pubkey, guarantor_repayment_pubkey_dst);
         pack_coption_key(collateral_account_pubkey, collateral_account_pubkey_dst);
         pack_coption_key(lender_pubkey, lender_pubkey_dst);
         pack_coption_key(lender_repayment_pubkey, lender_repayment_pubkey_dst);

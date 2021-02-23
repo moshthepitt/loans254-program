@@ -36,9 +36,10 @@ pub enum LoanInstruction {
     ///
     /// 0. `[signer]` The account of the person guaranteeing the loan
     /// 1. `[writable]` Token account that holds the collateral.  Should be owned by guarantor
-    /// 2. `[writable]` The loan account, has information about the loan
-    /// 3. `[]` The rent sysvar
-    /// 4. `[]` The token program
+    /// 2. `[writable]` Token account to which the guarantor's payment should be sent.
+    /// 3. `[writable]` The loan account, has information about the loan
+    /// 4. `[]` The rent sysvar
+    /// 5. `[]` The token program
     GuaranteeLoan,
     /// Accept the loan
     ///
@@ -130,6 +131,7 @@ pub fn guarantee_loan(
     program_id: Pubkey,
     guarantor_pubkey: Pubkey,
     collateral_account_pubkey: Pubkey,
+    guarantor_repayment_pubkey: Pubkey,
     loan_account_pubkey: Pubkey,
 ) -> Instruction {
     Instruction {
@@ -137,6 +139,7 @@ pub fn guarantee_loan(
         accounts: vec![
             AccountMeta::new(guarantor_pubkey, true),
             AccountMeta::new(collateral_account_pubkey, false),
+            AccountMeta::new(guarantor_repayment_pubkey, false),
             AccountMeta::new(loan_account_pubkey, false),
             AccountMeta::new_readonly(sysvar::rent::id(), false),
             AccountMeta::new_readonly(spl_token::id(), false),
