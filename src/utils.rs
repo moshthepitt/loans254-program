@@ -34,7 +34,7 @@ pub fn get_duration(
     _borrower: &Pubkey,
     _loan_amount: u64,
 ) -> u32 {
-    return 86400;
+    return 24 * 30;  // 30 days
 }
 
 /// get the loan processing fee
@@ -56,7 +56,7 @@ pub fn get_borrowed_amount(
 ) -> u64 {
     let processing_fee: u32 = get_processing_fee(borrower, expected_amount, loan_duration, loan_interest);
     let total_charge = loan_interest + processing_fee;
-    return (u64::from(loan_duration) / (86400 * 365)) * ((u64::from(total_charge) / 100) + 1) * expected_amount;
+    return (u64::from(loan_duration) / (24 * 365)) * ((u64::from(total_charge) / 100) + 1) * expected_amount;
 }
 
 // Helpers

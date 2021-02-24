@@ -30,7 +30,7 @@ pub struct Loan {
     pub expected_amount: u64,  // the expected loan amount
     pub amount: u64,  // the loan amount including interest
     pub interest_rate: u32,  // the loan interest rate annualized.  Note that this is an unsigned int so something like 9 would actually represent 9/100 interest rate
-    pub duration: u32,  // the loan duration in seconds
+    pub duration: u32,  // the loan duration in hours
 }
 
 impl Sealed for Loan {}
