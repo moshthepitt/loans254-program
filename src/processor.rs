@@ -186,6 +186,10 @@ pub fn process_guarantee_loan(
     if !loan_data.is_initialized() {
         return Err(ProgramError::UninitializedAccount);
     }
+    // fail if the status is not LoanStatus::Initialized
+    if loan_data.status != LoanStatus::Initialized as u8 {
+        return Err(LoanError::InvalidInstruction.into());
+    }
     // fail if collateral is not sufficient
     if collateral_account_info.lamports() < loan_data.amount {
         return Err(ProgramError::InsufficientFunds);
@@ -289,6 +293,10 @@ pub fn process_accept_loan(
     if !loan_data.is_initialized() {
         return Err(ProgramError::UninitializedAccount);
     }
+    // fail if the status is not LoanStatus::Guaranteed
+    if loan_data.status != LoanStatus::Guaranteed as u8 {
+        return Err(LoanError::InvalidInstruction.into());
+    }
     // Ensure we have the right account to send borrowed funds to
     if *borrower_loan_receive_account_info.key != loan_data.borrower_loan_receive_pubkey {
         return Err(LoanError::NotAuthorized.into());
@@ -373,6 +381,10 @@ pub fn process_repay_loan(
     // fail is loan is not initialized
     if !loan_data.is_initialized() {
         return Err(ProgramError::UninitializedAccount);
+    }
+    // fail if the status is not LoanStatus::Accepted
+    if loan_data.status != LoanStatus::Accepted as u8 {
+        return Err(LoanError::InvalidInstruction.into());
     }
     // fail if repayment transfer account balance is not sufficient
     if payer_token_account_info.lamports() < loan_data.amount {
