@@ -362,8 +362,8 @@ pub fn process_repay_loan(
     // get the accounts
     let payer_token_account_info = next_account_info(account_info_iter)?;
     let guarantor_account_info = next_account_info(account_info_iter)?;
-    let guarantor_token_account_info = next_account_info(account_info_iter)?;
     let collateral_token_account_info = next_account_info(account_info_iter)?;
+    let guarantor_token_account_info = next_account_info(account_info_iter)?;
     let lender_account_info = next_account_info(account_info_iter)?;
     let lender_token_account_info = next_account_info(account_info_iter)?;
     let loan_account_info = next_account_info(account_info_iter)?;
@@ -421,27 +421,11 @@ pub fn process_repay_loan(
     loan_data.status = LoanStatus::Repaid as u8;
     Loan::pack(loan_data, &mut loan_account_info.data.borrow_mut())?;
 
-    // change the owner of the payer repayment account to be the original lender
+    // get the pda and token acconts
     let pda_account_info = next_account_info(account_info_iter)?;
     let token_program = next_account_info(account_info_iter)?;
-    let repay_loan_ix = spl_token::instruction::set_authority(
-        token_program.key,
-        payer_token_account_info.key,
-        Some(lender_account_info.key),
-        spl_token::instruction::AuthorityType::AccountOwner,
-        payer_info.key,
-        &[&payer_info.key],
-    )?;
-    msg!("Calling the token program to return funds to the loan...");
-    invoke(
-        &repay_loan_ix,
-        &[
-            payer_token_account_info.clone(),
-            payer_info.clone(),
-            token_program.clone(),
-        ],
-    )?;
-    // transfer the funds to the guarantor
+
+    // transfer the funds to the guarantor repayment account
     let transfer_to_guarantor_ix = spl_token::instruction::transfer(
         token_program.key,
         payer_token_account_info.key,
@@ -450,7 +434,7 @@ pub fn process_repay_loan(
         &[&payer_info.key],
         guarantor_share,
     )?;
-    msg!("Calling the token program to pay the guarantor...");
+    msg!("Calling the token program to transfer funds to the guarantor payment account...");
     invoke(
         &transfer_to_guarantor_ix,
         &[
@@ -461,7 +445,7 @@ pub fn process_repay_loan(
         ],
     )?;
 
-    // transfer the funds to the lender
+    // transfer the funds to the lender repayment account
     let transfer_to_lender_ix = spl_token::instruction::transfer(
         token_program.key,
         payer_token_account_info.key,
@@ -470,7 +454,7 @@ pub fn process_repay_loan(
         &[&payer_info.key],
         total_lender_share,
     )?;
-    msg!("Calling the token program to pay the lender...");
+    msg!("Calling the token program to transfer funds to the lender payment account...");
     invoke(
         &transfer_to_lender_ix,
         &[
@@ -491,12 +475,52 @@ pub fn process_repay_loan(
         &pda,
         &[&pda],
     )?;
-    msg!("Calling the token program to return funds to the guarantor...");
+    msg!("Calling the token program to return collateral account to the guarantor...");
     invoke_signed(
         &return_collateral_ix,
         &[
             collateral_token_account_info.clone(),
             guarantor_account_info.clone(),
+            pda_account_info.clone(),
+            token_program.clone(),
+        ],
+        &[&[&b"loan"[..], &[nonce]]],
+    )?;
+    // change the owner of the guarantor payment account to be the original guarantor
+    let pay_guarantor_ix = spl_token::instruction::set_authority(
+        token_program.key,
+        guarantor_token_account_info.key,
+        Some(guarantor_account_info.key),
+        spl_token::instruction::AuthorityType::AccountOwner,
+        &pda,
+        &[&pda],
+    )?;
+    msg!("Calling the token program to return guarantor payment account to the guarantor...");
+    invoke_signed(
+        &pay_guarantor_ix,
+        &[
+            guarantor_token_account_info.clone(),
+            guarantor_account_info.clone(),
+            pda_account_info.clone(),
+            token_program.clone(),
+        ],
+        &[&[&b"loan"[..], &[nonce]]],
+    )?;
+    // change the owner of the lender payment account to be the original lender
+    let pay_lender_ix = spl_token::instruction::set_authority(
+        token_program.key,
+        lender_token_account_info.key,
+        Some(lender_account_info.key),
+        spl_token::instruction::AuthorityType::AccountOwner,
+        &pda,
+        &[&pda],
+    )?;
+    msg!("Calling the token program to return lender payment account to the lender...");
+    invoke_signed(
+        &pay_lender_ix,
+        &[
+            lender_token_account_info.clone(),
+            lender_account_info.clone(),
             pda_account_info.clone(),
             token_program.clone(),
         ],
