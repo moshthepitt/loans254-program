@@ -86,8 +86,8 @@ pub fn process_init_loan(
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    // get the temp token account owned by the initializer
-    let application_fee_account = next_account_info(account_info_iter)?;
+    // get the mint account to be used for this loan
+    let loan_mint_account = next_account_info(account_info_iter)?;
 
     // the account that will receive the loan if it goes through
     // ensure that it is owned by the program
@@ -120,37 +120,13 @@ pub fn process_init_loan(
     loan_info.is_initialized = true;
     loan_info.status = LoanStatus::Initialized as u8;
     loan_info.initializer_pubkey = *initializer.key;
-    loan_info.application_fee_account_pubkey = *application_fee_account.key;
+    loan_info.loan_mint_pubkey = *loan_mint_account.key;
     loan_info.borrower_loan_receive_pubkey = *token_to_receive_account.key;
     loan_info.expected_amount = amount;
     loan_info.interest_rate = get_interest_rate(&initializer.key,  amount);
     loan_info.duration = get_duration(&initializer.key,  amount);
     loan_info.amount = get_borrowed_amount(&initializer.key, amount, loan_info.duration, loan_info.interest_rate);
     Loan::pack(loan_info, &mut loan_account.data.borrow_mut())?;
-
-    // get the program derived address
-    let (pda, _bump_seed) = Pubkey::find_program_address(&[b"loan"], program_id);
-    // change the owner of the application_fee_account to be the pda
-    // essentially the program now fully controls the loan application fees
-    let token_program = next_account_info(account_info_iter)?;
-    let owner_change_ix = spl_token::instruction::set_authority(
-        token_program.key,
-        application_fee_account.key,
-        Some(&pda),
-        spl_token::instruction::AuthorityType::AccountOwner,
-        initializer.key,
-        &[&initializer.key],
-    )?;
-
-    msg!("Calling the token program to transfer application fee account ownership...");
-    invoke(
-        &owner_change_ix,
-        &[
-            application_fee_account.clone(),
-            initializer.clone(),
-            token_program.clone(),
-        ],
-    )?;
 
     Ok(())
 }

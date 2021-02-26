@@ -20,7 +20,7 @@ pub struct Loan {
     pub is_initialized: bool,
     pub status: u8,  // the loan status
     pub initializer_pubkey: Pubkey,  // the account that wants to borrow
-    pub application_fee_account_pubkey: Pubkey,  // this account holds loan processing fee
+    pub loan_mint_pubkey: Pubkey,  // this account holds loan processing fee
     pub borrower_loan_receive_pubkey: Pubkey, // loan amount will be sent here if successful
     pub guarantor_pubkey: COption<Pubkey>, // the person providing collateral for the loans
     pub guarantor_repayment_pubkey: COption<Pubkey>, // account to repay the guarantor
@@ -49,7 +49,7 @@ impl Pack for Loan {
             is_initialized,
             status,
             initializer_pubkey,
-            application_fee_account_pubkey,
+            loan_mint_pubkey,
             borrower_loan_receive_pubkey,
             guarantor_pubkey,
             guarantor_repayment_pubkey,
@@ -71,7 +71,7 @@ impl Pack for Loan {
             is_initialized,
             status: u8::from_le_bytes(*status),
             initializer_pubkey: Pubkey::new_from_array(*initializer_pubkey),
-            application_fee_account_pubkey: Pubkey::new_from_array(*application_fee_account_pubkey),
+            loan_mint_pubkey: Pubkey::new_from_array(*loan_mint_pubkey),
             borrower_loan_receive_pubkey: Pubkey::new_from_array(*borrower_loan_receive_pubkey),
             guarantor_pubkey: unpack_coption_key(guarantor_pubkey)?,
             guarantor_repayment_pubkey: unpack_coption_key(guarantor_repayment_pubkey)?,
@@ -91,7 +91,7 @@ impl Pack for Loan {
             is_initialized_dst,
             status_dst,
             initializer_pubkey_dst,
-            application_fee_account_pubkey_dst,
+            loan_mint_pubkey_dst,
             borrower_loan_receive_pubkey_dst,
             guarantor_pubkey_dst,
             guarantor_repayment_pubkey_dst,
@@ -108,7 +108,7 @@ impl Pack for Loan {
             is_initialized,
             status,
             initializer_pubkey,
-            application_fee_account_pubkey,
+            loan_mint_pubkey,
             borrower_loan_receive_pubkey,
             guarantor_pubkey,
             guarantor_repayment_pubkey,
@@ -124,7 +124,7 @@ impl Pack for Loan {
         is_initialized_dst[0] = *is_initialized as u8;
         *status_dst = status.to_le_bytes();
         initializer_pubkey_dst.copy_from_slice(initializer_pubkey.as_ref());
-        application_fee_account_pubkey_dst.copy_from_slice(application_fee_account_pubkey.as_ref());
+        loan_mint_pubkey_dst.copy_from_slice(loan_mint_pubkey.as_ref());
         borrower_loan_receive_pubkey_dst.copy_from_slice(borrower_loan_receive_pubkey.as_ref());
         pack_coption_key(guarantor_pubkey, guarantor_pubkey_dst);
         pack_coption_key(guarantor_repayment_pubkey, guarantor_repayment_pubkey_dst);
