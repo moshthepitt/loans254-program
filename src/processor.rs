@@ -11,6 +11,7 @@ use solana_program::{
 };
 use crate::{instruction::LoanInstruction, error::LoanError, state::{Loan, LoanStatus}};
 use crate::{utils::{
+    get_application_fee,
     get_borrowed_amount,
     get_duration,
     get_interest_rate,
@@ -107,6 +108,11 @@ pub fn process_init_loan(
     let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
     if !rent.is_exempt(loan_account.lamports(), loan_account.data_len()) {
         return Err(LoanError::NotRentExempt.into());
+    }
+    // fail if loan account does not cover application fee
+    let fee = (get_application_fee(&initializer.key, amount) * amount) / 100;
+    if loan_account.lamports() < fee  {
+        return Err(ProgramError::InsufficientFunds);
     }
 
     // get the loan information

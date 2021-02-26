@@ -47,6 +47,14 @@ pub fn get_processing_fee(
     return 1;  // 1%
 }
 
+/// get the loan application fee
+pub fn get_application_fee(
+    _borrower: &Pubkey,
+    _expected_amount: u64,
+) -> u64 {
+    return 1;  // 1%
+}
+
 /// get the loan duration
 pub fn get_borrowed_amount(
     borrower: &Pubkey,
