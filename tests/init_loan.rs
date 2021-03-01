@@ -20,9 +20,9 @@ use safe_transmute::to_bytes::{transmute_to_bytes};
 use bumpalo::{vec as bump_vec, Bump};
 use rand::prelude::*;
 
-use mosh_love_oov::instruction::{init_loan};
-use mosh_love_oov::processor::{Processor};
-use mosh_love_oov::state::{Loan, LoanStatus};
+use loans254::instruction::{init_loan};
+use loans254::processor::{Processor};
+use loans254::state::{Loan, LoanStatus};
 
 fn do_process_instruction(
     instruction: Instruction,
