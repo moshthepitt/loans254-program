@@ -400,16 +400,16 @@ pub fn process_repay_loan(
         return Err(LoanError::NotAuthorized.into());
     }
     // calculate repayments
-    let loan_interest = loan_data.amount - loan_data.expected_amount;
-    let program_share = loan_interest * (u64::from(get_processing_fee(
+    let loan_interest = (loan_data.amount - loan_data.expected_amount) as f64;
+    let program_share = loan_interest as f64 * get_processing_fee(
         &loan_data.initializer_pubkey,
         loan_data.expected_amount,
         loan_data.duration,
         loan_data.interest_rate
-    )) / 100);
-    let lender_share = (loan_interest - program_share) * (u64::from(get_lender_share(lender_account_info.key, loan_data.amount)) / 100);
-    let total_lender_share = lender_share + loan_data.expected_amount;
-    let guarantor_share = (loan_interest - program_share) * (u64::from(get_guarantor_share(guarantor_account_info.key, loan_data.amount)) / 100);
+    ) as f64 / 100 as f64;
+    let lender_share = (loan_interest - program_share) * (get_lender_share(lender_account_info.key, loan_data.amount) as f64 / 100 as f64);
+    let total_lender_share = lender_share as u64 + loan_data.expected_amount;
+    let guarantor_share = (loan_interest - program_share) * (get_guarantor_share(guarantor_account_info.key, loan_data.amount) as f64 / 100 as f64);
     // update loan info
     msg!("Updating loan information, setting status to repaid...");
     loan_data.status = LoanStatus::Repaid as u8;
@@ -426,7 +426,7 @@ pub fn process_repay_loan(
         guarantor_token_account_info.key,
         payer_info.key,
         &[&payer_info.key],
-        guarantor_share,
+        guarantor_share as u64,
     )?;
     msg!("Calling the token program to transfer funds to the guarantor payment account...");
     invoke(
