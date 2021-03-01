@@ -167,24 +167,24 @@ async fn test_process_init_loan() {
 
     // assert_ne!(token_acc.owner, account_key);
 
-    let load_data = Loan::unpack(&loan_acc.data);
-    let load_data = match load_data {
+    let loan_data = Loan::unpack(&loan_acc.data);
+    let loan_data = match loan_data {
         Ok(data) => data,
-        Err(error) => panic!("Problem opening the file: {:?}", error),
+        Err(error) => panic!("Problem: {:?}", error),
     };
-    assert_eq!(true, load_data.is_initialized);
-    assert_eq!(account_key, load_data.initializer_pubkey);
-    assert_eq!(*temp_token_vault.key, load_data.application_fee_account_pubkey);
-    assert_eq!(*receiving_token_vault.key, load_data.borrower_loan_receive_pubkey);
-    assert_eq!(13337, load_data.expected_amount);
-    assert_eq!(9, load_data.interest_rate);
-    assert_eq!(24 * 30, load_data.duration);
-    assert_eq!(LoanStatus::Initialized as u8, load_data.status);
-    assert_eq!(13337 * (86400 / (86400 * 365) * (1 + 09 + 01)), load_data.amount);
+    assert_eq!(true, loan_data.is_initialized);
+    assert_eq!(account_key, loan_data.initializer_pubkey);
+    assert_eq!(*temp_token_vault.key, loan_data.loan_mint_pubkey);
+    assert_eq!(*receiving_token_vault.key, loan_data.borrower_loan_receive_pubkey);
+    assert_eq!(13337, loan_data.expected_amount);
+    assert_eq!(9, loan_data.interest_rate);
+    assert_eq!(24 * 30, loan_data.duration);
+    assert_eq!(LoanStatus::Initialized as u8, loan_data.status);
+    assert_eq!(13446, loan_data.amount);
 
     // let option = Some(account_key);
     // let c_option: COption<Pubkey> = option.into();
-    assert_eq!(false, load_data.guarantor_pubkey.is_some());
-    assert_eq!(false, load_data.lender_pubkey.is_some());
-    assert_eq!(false, load_data.lender_repayment_pubkey.is_some());
+    assert_eq!(false, loan_data.guarantor_pubkey.is_some());
+    assert_eq!(false, loan_data.lender_pubkey.is_some());
+    assert_eq!(false, loan_data.lender_repayment_pubkey.is_some());
 }
