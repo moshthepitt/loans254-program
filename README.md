@@ -4,6 +4,8 @@ Loans254 is a smart contract that lives on the Solana blockchain and whose purpo
 
 More information can be found on the [companion UI repo](https://github.com/moshthepitt/kenyaloans-defi).
 
+[Live Demo](https://moshthepitt.github.io/kenyaloans-defi/)
+
 ## Environment Setup
 
 1. Install Rust from https://rustup.rs/
