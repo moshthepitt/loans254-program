@@ -110,8 +110,8 @@ pub fn process_init_loan(
         return Err(LoanError::NotRentExempt.into());
     }
     // fail if loan account does not cover application fee
-    let fee = (get_application_fee(&initializer.key, amount) * amount) / 100;
-    if loan_account.lamports() < fee  {
+    let fee = get_application_fee(&initializer.key, amount) * amount as f64;
+    if loan_account.lamports() < fee as u64  {
         return Err(ProgramError::InsufficientFunds);
     }
 

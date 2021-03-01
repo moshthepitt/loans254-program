@@ -51,8 +51,8 @@ pub fn get_processing_fee(
 pub fn get_application_fee(
     _borrower: &Pubkey,
     _expected_amount: u64,
-) -> u64 {
-    return 1;  // 1%
+) -> f64 {
+    return 0.001;
 }
 
 /// get the loan duration
@@ -64,7 +64,10 @@ pub fn get_borrowed_amount(
 ) -> u64 {
     let processing_fee: u32 = get_processing_fee(borrower, expected_amount, loan_duration, loan_interest);
     let total_charge = loan_interest + processing_fee;
-    return (u64::from(loan_duration) / (24 * 365)) * ((u64::from(total_charge) / 100) + 1) * expected_amount;
+    let rate = (total_charge as f64 / 100 as f64) as f64;
+    let pro_rated_duration = loan_duration as f64 / (24 * 365) as f64;
+    let pro_rated_rate = rate * pro_rated_duration + 1 as f64;
+    return (expected_amount as f64 * pro_rated_rate) as u64;
 }
 
 // Helpers
